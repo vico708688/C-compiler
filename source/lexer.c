@@ -10,18 +10,16 @@
 static int column = 0;
 static int line = 0;
 
-static int nbToken = 0;
-
 /* Ajoute un caractère au token voulu */
-void addToken(TOKEN_LIST *tokenList, TOKEN_TYPE type, VALUE_UNION value) {
+void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE value) {
 	TOKEN token = { .type = type, .value = value, .line = line, .column = column };
 	
 
-	tokenList->tokens[nbToken] = token; /* tester si il reste de la place dans la liste */
-	nbToken++;
+	tokenList->tokens[tokenList->indexToken] = token; /* tester si il reste de la place dans la liste */
+	(tokenList->indexToken)++;
 }
 
-int canAddKeywordToken(TOKEN_LIST *tokenList, VALUE_UNION value) {
+int canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value) {
 	if ((strcmp(value.value_str, "main") == 0) |
 		(strcmp(value.value_str, "int") == 0) |
 		(strcmp(value.value_str, "while") == 0) |
@@ -42,16 +40,33 @@ int isAtNewLine(char** text) {
 	return **text == '\n';
 }
 
-int isString(char** text, int* lenToken) {
-	regex_t regexChar;
+int isString(char** text, int* lenToken, regex_t* regex) {
 	regmatch_t pmatch[1];
 
-	if(regcomp(&regexChar, "^\".*\"", REG_EXTENDED)) {
-		perror("Error regcomp\n");
-		exit(1);
+	if (regexec(regex, *text, 1, pmatch, 0) == 0) {
+		*lenToken = pmatch[0].rm_eo;
+		return 1;
 	}
 
-	if (regexec(&regexChar, *text, 1, pmatch, 0) == 0) {
+	return 0;
+}
+
+/* Seulement entiers positifs pour l'instant */
+int isNumber(char** text, int* lenToken, regex_t* regex) {
+	regmatch_t pmatch[1];
+	
+	if (regexec(regex, *text, 1, pmatch, 0) == 0) {
+		*lenToken = pmatch[0].rm_eo;
+		return 1;
+	}
+
+	return 0;
+}
+
+int isCharac(char** text, int* lenToken, regex_t* regex) {
+	regmatch_t pmatch[1];
+
+	if (regexec(regex, *text, 1, pmatch, 0) == 0) {
 		*lenToken = pmatch[0].rm_eo;
 		return 1;
 	}
@@ -65,47 +80,13 @@ char* getString(char** text, int lenToken) {
 	return string;
 }
 
-/* Seulement entiers positifs */
-int isNumber(char** text, int* lenToken) {
-	regex_t regex;
-	regmatch_t pmatch[1];
-	
-	if(regcomp(&regex, "^[0-9]+", REG_EXTENDED)) {
-		perror("Error regcomp\n");
-		exit(1);
-	}
-	
-	if (regexec(&regex, *text, 1, pmatch, 0) == 0) {
-		*lenToken = pmatch[0].rm_eo;
-		return 1;
-	}
-
-	return 0;
-}
-
-char* getNumber(char** text, int lenToken) {
+int getNumber(char** text, int lenToken) {
 	char* string = extractSubString(text, lenToken);
-
+	
 	int number = atoi(string);
-
-	return string;
-}
-
-int isChar(char** text, int* lenToken) {
-	regex_t regexChar;
-	regmatch_t pmatch[1];
-
-	if(regcomp(&regexChar, "^[[:alpha:]][a-zA-Z_0-9]*", REG_EXTENDED)) {
-		perror("Error regcomp\n");
-		exit(1);
-	}
-
-	if (regexec(&regexChar, *text, 1, pmatch, 0) == 0) {
-		*lenToken = pmatch[0].rm_eo;
-		return 1;
-	}
-
-	return 0;
+	
+	free(string);
+	return number;
 }
 
 char* getChar(char** text, int lenToken) {
@@ -114,10 +95,13 @@ char* getChar(char** text, int lenToken) {
 	return word;
 }
 
+/**
+* @brief: Consomme nb caractères de la string pointée par text.
+*/
 void advance(char** text, int nb) {
 	column += nb;
 	if (isAtNewLine(text)) {
-		line += nb;
+		line++;
 		column = 0;
 	}
 	(*text) += nb; /* /!\ Ordre des opérateurs : *text++ <=> *(text++) */
@@ -125,6 +109,11 @@ void advance(char** text, int nb) {
 
 void lexer(char** text, TOKEN_LIST *tokenList) {
 	int lenToken = 0;
+	/* Allocation sur la pile (variable locale).
+	*  Avant, j'avais écrit : regexList* regexes; ceci allouait sur le tas sans initialiser avec malloc -> pointe nulle part.
+	*/
+	regexList regexes;
+	initRegexes(&regexes);
 
 	/* Analyse lexicale */
 	printf("\nDébut de l'analyse lexicale...\n\n");
@@ -134,17 +123,17 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			continue;
 		}
 
-		VALUE_UNION value = { 0 };
+		union TOKEN_VALUE value = { 0 };
 		switch (**text) {
-			/* OPERATOR */
+			/* OPERATOR : mettre en regex ? */
 			case '+': value.value_str = "+"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
 			case '-': value.value_str = "-"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
 			case '=': value.value_str = "="; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
 			case '<': value.value_str = "<"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
 			case '>': value.value_str = ">"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			case '!': value.value_str = "!"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
 			case '%': value.value_str = "%"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-
+			case '!': value.value_str = "!"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
+			
 			/* PONCTUATION */
 			case ';': value.value_str = ";"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
 			case ',': value.value_str = ","; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
@@ -158,21 +147,22 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			/* LITERALS + IDENTIFIERS + KEYWORDS */
 			default:
 			{
-				if (isString(text, &lenToken)) {
-					value.value_str = getString(text, lenToken);
-					addToken(tokenList, LITERAL, value);
+				if (isString(text, &lenToken, &(regexes.string))) {
+					advance(text, 1); /* Enlève le premier '"' */
+					value.value_str = getString(text, lenToken - 2); /* Récupère l'interieur de la chaine de caractères */
+					addToken(tokenList, STRING, value);
+					advance(text, lenToken); /* Consomme le reste de la string */
+				}
+				else if (isNumber(text, &lenToken, &(regexes.number))) {
+					value.value_int = getNumber(text, lenToken);
+					addToken(tokenList, NUMBER, value);
 					advance(text, lenToken);
 				}
-				else if (isNumber(text, &lenToken)) {
-					value.value_str = getNumber(text, lenToken);
-					addToken(tokenList, LITERAL, value);
-					advance(text, lenToken);
-				}
-				else if (isChar(text, &lenToken)) {
+				else if (isCharac(text, &lenToken, &(regexes.charac))) {
 					value.value_str = getChar(text, lenToken);
 					/* Si le mot est un keyword, on l'ajoute à la liste, sinon c'est un identifier */
 					if (!canAddKeywordToken(tokenList, value)){
-						addToken(tokenList, LITERAL, value);
+						addToken(tokenList, IDENTIFIER, value);
 					}
 					advance(text, lenToken);
 				}
@@ -186,26 +176,36 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 	}
 
 	printf("\nAnalyse lexicale terminée.\n");
-	printf("Liste des tokens (%d tokens):\n\n", nbToken);
+	printf("Liste des tokens (%d tokens):\n\n", tokenList->indexToken);
 	char* tokenType;
-	for (int i = 0; i < nbToken; i++) {
-		switch (tokenList->tokens[i].type) {
+	for (int i = 0; i < tokenList->indexToken; i++) {
+		TOKEN token = tokenList->tokens[i];
+		switch (token.type) {
 			case 0: tokenType = "OPERATOR"; break;
 			case 1: tokenType = "KEYWORD"; break;
 			case 2: tokenType = "IDENTIFIER"; break;
 			case 3: tokenType = "PONCTUATION"; break;
-			case 4: tokenType = "LITERAL"; break;
+			case 4: tokenType = "STRING"; break;
+			case 5: tokenType = "NUMBER"; break;
 		}
-		printf("#%d, TYPE: %s, VALUE: %s, LINE: %d, COLUMN: %d\n", i, tokenType, tokenList->tokens[i].value.value_str, tokenList->tokens[i].line, tokenList->tokens[i].column);
+		if (token.type == 5) {
+			printf("#%d, TYPE: %s, VALUE: %d, LINE: %d, COLUMN: %d\n", i, tokenType, token.value.value_int, token.line, token.column);
+		}
+		else {
+			printf("#%d, TYPE: %s, VALUE: %s, LINE: %d, COLUMN: %d\n", i, tokenType, token.value.value_str, token.line, token.column);
+		}
 	}
 	printf("\n");
+
+	freeRegexes(&regexes);
 }
 
 TOKEN_LIST initTokenList(char** text) {
 	int lenOfText = lenText(text);
+	/* Changer, allouer ~256 tokens puis realloc */
 	TOKEN_LIST list = { .size = 2 * lenOfText };
 	
-	if ((list.tokens = malloc(list.size * sizeof(TOKEN))) == NULL) { /* Facteur 2 pris au hazard */
+	if ((list.tokens = malloc(list.size * sizeof(TOKEN))) == NULL) {
 		perror("Error malloc\n");
 		exit(1);
 	}
@@ -222,18 +222,20 @@ int main(int argc, char* argv[]) {
 
 	FILE* file = fopen(argv[1], "r");
 	char* text = read_file(file);
+	char* backup_text = text; /* Modification de pointeur text dans lexer(), il faut donc sauvegarder le pointeur d'origine */
 
 	TOKEN_LIST tokenList = initTokenList(&text);
 
 	lexer(&text, &tokenList);
 
 	freeTokens(&tokenList);
+	free(backup_text);
 
 	return 0;
 }
 
 /* TODO
-	* ne pas recalculer les regex à chaque fois
-	* fonctionnement union avec le value_str et value_int (condition sur le type ?)
 	* compléter la liste des keywords
+	* allocation dynamique tokenList
+	* 
 */

@@ -8,20 +8,20 @@
 
 char* read_file(FILE* fd) {
 	int length;
-        char* text;
+	char* text;
 
-        /* Récupère tout le code dans un tableau */
-        fseek(fd, 0, SEEK_END);
-        length = ftell(fd);
-        rewind(fd);
+	/* Récupère tout le code dans un tableau */
+	fseek(fd, 0, SEEK_END);
+	length = ftell(fd);
+	rewind(fd);
 
-        if ((text = malloc(length * sizeof(char) + 1)) == NULL) {
-                perror("Error malloc\n");
-                exit(1);
-        }
+	if ((text = malloc(length * sizeof(char) + 1)) == NULL) {
+			perror("Error malloc\n");
+			exit(1);
+	}
 
-        size_t read_len = fread(text, 1, length, fd);
-        text[read_len]='\0';
+	size_t read_len = fread(text, 1, length, fd);
+	text[read_len]='\0';
 
 	fclose(fd);
 
@@ -40,17 +40,21 @@ int lenText(char** ptext) {
 	return counter;
 }
 
-void freeAll(TOKEN_LIST* tokenList, regex_t* regex) {
-	freeTokens(tokenList);
-	freeRegexes(regex);
-}
-
 void freeTokens(TOKEN_LIST *tokenList) {
+	for (int i = 0; i < tokenList->indexToken; i++) {
+		if ((tokenList->tokens[i].type == STRING) |
+			(tokenList->tokens[i].type == IDENTIFIER) |
+			(tokenList->tokens[i].type == KEYWORD)) {
+			free(tokenList->tokens[i].value.value_str);
+		}
+	}
 	free(tokenList->tokens);
 }
 
-void freeRegexes(regex_t* regex) {
-	regfree(regex);
+void freeRegexes(regexList* regexes) {
+	regfree(&(regexes->number));
+	regfree(&(regexes->string));
+	regfree(&(regexes->charac));
 }
 
 char* extractSubString(char** string, int len) {
@@ -64,4 +68,21 @@ char* extractSubString(char** string, int len) {
 	subString[len] = '\0';
 
 	return subString;
+}
+
+void initRegexes(regexList* regexes) {
+	if(regcomp(&(regexes->number), "^[0-9]+", REG_EXTENDED)) {
+		perror("Error regcomp number\n");
+		exit(1);
+	}
+
+	if(regcomp(&(regexes->string), "\"[^\"]*\"", REG_EXTENDED)) {
+		perror("Error regcomp string\n");
+		exit(1);
+	}
+
+	if(regcomp(&(regexes->charac), "^[[:alpha:]][a-zA-Z_0-9]*", REG_EXTENDED)) {
+		perror("Error regcomp charac\n");
+		exit(1);
+	}
 }

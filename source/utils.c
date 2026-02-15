@@ -15,8 +15,8 @@ char* read_file(FILE* fd) {
 	length = ftell(fd);
 	rewind(fd);
 
-	if ((text = malloc(length * sizeof(char) + 1)) == NULL) {
-			perror("Error malloc\n");
+	if ((text = calloc(length, sizeof(char) + 1)) == NULL) {
+			perror("Error calloc\n");
 			exit(1);
 	}
 
@@ -59,7 +59,7 @@ void freeRegexes(regexList* regexes) {
 
 char* extractSubString(char** string, int len) {
 	/* Allocation sur la heap pour pouvoir sauvegarder cette donnée (+1 pour le '\0') */
-	char* subString = malloc((len + 1) * sizeof(char));
+	char* subString = calloc(len + 1, sizeof(char));
 
 	/* Copie de la string d'origine troncatée à la bonne longueur dans subString */
 	strncpy(subString, *string, len);
@@ -76,7 +76,7 @@ void initRegexes(regexList* regexes) {
 		exit(1);
 	}
 
-	if(regcomp(&(regexes->string), "\"[^\"]*\"", REG_EXTENDED)) {
+	if(regcomp(&(regexes->string), "^\"[^\"\n]*\"", REG_EXTENDED)) {
 		perror("Error regcomp string\n");
 		exit(1);
 	}

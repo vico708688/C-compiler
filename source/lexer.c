@@ -14,16 +14,27 @@ static int line = 0;
 void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE value) {
 	TOKEN token = { .type = type, .value = value, .line = line, .column = column };
 	
-
-	tokenList->tokens[tokenList->indexToken] = token; /* tester si il reste de la place dans la liste */
+	if (tokenList->indexToken >= tokenList->size) {
+		TOKEN *tmp = NULL; /* temporary buffer for realloc */
+		tokenList->size *= 2;
+		tmp = realloc(tokenList->tokens, tokenList->size * sizeof(TOKEN));
+		if (tmp == NULL) {
+				freeTokens(tokenList);
+				perror("Error realloc\n");
+				exit(1);
+		}
+		tokenList->tokens = tmp;
+	}
+	tokenList->tokens[tokenList->indexToken] = token; /* tester s'il reste de la place dans la liste */
 	(tokenList->indexToken)++;
 }
 
+/* Changer l'implémentation du test de valeur des tokens */
 int canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value) {
-	if ((strcmp(value.value_str, "main") == 0) |
-		(strcmp(value.value_str, "int") == 0) |
-		(strcmp(value.value_str, "while") == 0) |
-		(strcmp(value.value_str, "if") == 0) |
+	if ((strcmp(value.value_str, "main") == 0) ||
+		(strcmp(value.value_str, "int") == 0) ||
+		(strcmp(value.value_str, "while") == 0) ||
+		(strcmp(value.value_str, "if") == 0) ||
 		(strcmp(value.value_str, "for") == 0)) {
 		addToken(tokenList, KEYWORD, value);
 		return 1;
@@ -110,7 +121,7 @@ void advance(char** text, int nb) {
 void lexer(char** text, TOKEN_LIST *tokenList) {
 	int lenToken = 0;
 	/* Allocation sur la pile (variable locale).
-	*  Avant, j'avais écrit : regexList* regexes; ceci allouait sur le tas sans initialiser avec malloc -> pointe nulle part.
+	*  Avant, j'avais écrit : regexList* regexes; ceci allouait sur le tas sans initialiser avec calloc -> pointe nulle part.
 	*/
 	regexList regexes;
 	initRegexes(&regexes);
@@ -118,7 +129,7 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 	/* Analyse lexicale */
 	printf("\nDébut de l'analyse lexicale...\n\n");
 	while (!isAtEnd(text)) {
-		if (**text == ' ') {
+		if (**text == ' ' || **text == '\n' || **text == '\t') {
 			advance(text, 1);
 			continue;
 		}
@@ -137,6 +148,7 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			/* PONCTUATION */
 			case ';': value.value_str = ";"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
 			case ',': value.value_str = ","; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
+			case '.': value.value_str = "."; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
 			case '(': value.value_str = "("; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
 			case ')': value.value_str = ")"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
 			case '}': value.value_str = "}"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
@@ -144,30 +156,33 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			case ']': value.value_str = "]"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
 			case '[': value.value_str = "["; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
 
-			/* LITERALS + IDENTIFIERS + KEYWORDS */
+			/* STRINGS + NUMBERS + IDENTIFIERS + KEYWORDS */
 			default:
 			{
+				/* STRINGS */
 				if (isString(text, &lenToken, &(regexes.string))) {
 					advance(text, 1); /* Enlève le premier '"' */
-					value.value_str = getString(text, lenToken - 2); /* Récupère l'interieur de la chaine de caractères */
+					value.value_str = getString(text, lenToken - 2); /* -2 : récupère l'interieur de la chaine de caractères */
 					addToken(tokenList, STRING, value);
 					advance(text, lenToken); /* Consomme le reste de la string */
 				}
+				/* NUMBERS */
 				else if (isNumber(text, &lenToken, &(regexes.number))) {
 					value.value_int = getNumber(text, lenToken);
 					addToken(tokenList, NUMBER, value);
 					advance(text, lenToken);
 				}
+				/* IDENTIFIERS + KEYWORDS */
 				else if (isCharac(text, &lenToken, &(regexes.charac))) {
 					value.value_str = getChar(text, lenToken);
-					/* Si le mot est un keyword, on l'ajoute à la liste, sinon c'est un identifier */
-					if (!canAddKeywordToken(tokenList, value)){
+					if (!canAddKeywordToken(tokenList, value)){ /* KEYWORDS */
+						/* IDENTIFIERS */
 						addToken(tokenList, IDENTIFIER, value);
 					}
 					advance(text, lenToken);
 				}
 				else {
-					//printf("Unknown caracter: %c, at line %d, column %d.\n", **text, line, column);
+					printf("Unknown caracter: %c, at line %d, column %d.\n", **text, line, column);
 					advance(text, 1);
 				}
 				break;
@@ -202,15 +217,14 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 
 TOKEN_LIST initTokenList(char** text) {
 	int lenOfText = lenText(text);
-	/* Changer, allouer ~256 tokens puis realloc */
-	TOKEN_LIST list = { .size = 2 * lenOfText };
+	/* Allocation de 256 tokens puis realloc */
+	TOKEN_LIST list = { .size = 256 };
 	
-	if ((list.tokens = malloc(list.size * sizeof(TOKEN))) == NULL) {
-		perror("Error malloc\n");
+	if ((list.tokens = calloc(list.size, sizeof(TOKEN))) == NULL) {
+		perror("Error calloc\n");
 		exit(1);
 	}
-	printf("Nb estimé de tokens : %d\n", list.size);
-	
+
 	return list;
 }
 
@@ -235,7 +249,7 @@ int main(int argc, char* argv[]) {
 }
 
 /* TODO
-	* compléter la liste des keywords
+	* compléter la liste des keywords (pas hardcoder)
 	* allocation dynamique tokenList
-	* 
+	* enlever les static pour multithreading
 */

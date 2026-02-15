@@ -1,10 +1,8 @@
-#include <stdio.h>
+#include "utils.h"
+
 #include <stdlib.h>
 #include <regex.h>
 #include <string.h>
-
-#include "lexer.h"
-#include "utils.h"
 
 char* read_file(FILE* fd) {
 	int length;
@@ -26,18 +24,6 @@ char* read_file(FILE* fd) {
 	fclose(fd);
 
 	return text;
-}
-
-int lenText(char** ptext) {
-	int counter = 0;
-	char* text = *ptext;
-
-	while (!isAtEnd(&text)) {
-		if (*text == ' ' || *text == '\n') counter++;
-		text++;
-	}
-
-	return counter;
 }
 
 void freeTokens(TOKEN_LIST *tokenList) {
@@ -85,4 +71,16 @@ void initRegexes(regexList* regexes) {
 		perror("Error regcomp charac\n");
 		exit(1);
 	}
+}
+
+TOKEN_LIST initTokenList(char** text) {
+	/* Allocation de 256 tokens puis realloc */
+	TOKEN_LIST list = { .size = 256 };
+	
+	if ((list.tokens = calloc(list.size, sizeof(TOKEN))) == NULL) {
+		perror("Error calloc\n");
+		exit(1);
+	}
+
+	return list;
 }

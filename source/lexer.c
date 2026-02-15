@@ -1,11 +1,10 @@
+#include "lexer.h"
+
 #include <stdlib.h>
 #include <stdio.h>
-#include <regex.h>
 #include <string.h>
 
-#include "lexer.h"
 #include "utils.h"
-
 
 static int column = 0;
 static int line = 0;
@@ -107,7 +106,7 @@ char* getChar(char** text, int lenToken) {
 }
 
 /**
-* @brief: Consomme nb caractères de la string pointée par text.
+* @brief Consomme nb caractères de la string pointée par text.
 */
 void advance(char** text, int nb) {
 	column += nb;
@@ -118,6 +117,9 @@ void advance(char** text, int nb) {
 	(*text) += nb; /* /!\ Ordre des opérateurs : *text++ <=> *(text++) */
 }
 
+/**
+* @brief Créer une liste de tokens à partir d'une chaine text et la stock dans tokenList
+*/
 void lexer(char** text, TOKEN_LIST *tokenList) {
 	int lenToken = 0;
 	/* Allocation sur la pile (variable locale).
@@ -127,7 +129,6 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 	initRegexes(&regexes);
 
 	/* Analyse lexicale */
-	printf("\nDébut de l'analyse lexicale...\n\n");
 	while (!isAtEnd(text)) {
 		if (**text == ' ' || **text == '\n' || **text == '\t') {
 			advance(text, 1);
@@ -136,7 +137,7 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 
 		union TOKEN_VALUE value = { 0 };
 		switch (**text) {
-			/* OPERATOR : mettre en regex ? */
+			/* OPERATOR */
 			case '+': value.value_str = "+"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
 			case '-': value.value_str = "-"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
 			case '=': value.value_str = "="; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
@@ -190,7 +191,7 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 		}
 	}
 
-	printf("\nAnalyse lexicale terminée.\n");
+	/* DEBUG */
 	printf("Liste des tokens (%d tokens):\n\n", tokenList->indexToken);
 	char* tokenType;
 	for (int i = 0; i < tokenList->indexToken; i++) {
@@ -215,41 +216,8 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 	freeRegexes(&regexes);
 }
 
-TOKEN_LIST initTokenList(char** text) {
-	int lenOfText = lenText(text);
-	/* Allocation de 256 tokens puis realloc */
-	TOKEN_LIST list = { .size = 256 };
-	
-	if ((list.tokens = calloc(list.size, sizeof(TOKEN))) == NULL) {
-		perror("Error calloc\n");
-		exit(1);
-	}
-
-	return list;
-}
-
-int main(int argc, char* argv[]) {
-	if (argc != 2) {
-		printf("Usage : %s <file_name>\n", argv[0]);
-		exit(0);
-	}
-
-	FILE* file = fopen(argv[1], "r");
-	char* text = read_file(file);
-	char* backup_text = text; /* Modification de pointeur text dans lexer(), il faut donc sauvegarder le pointeur d'origine */
-
-	TOKEN_LIST tokenList = initTokenList(&text);
-
-	lexer(&text, &tokenList);
-
-	freeTokens(&tokenList);
-	free(backup_text);
-
-	return 0;
-}
-
 /* TODO
 	* compléter la liste des keywords (pas hardcoder)
-	* allocation dynamique tokenList
 	* enlever les static pour multithreading
+	* mettre en regex les opérateurs ?
 */

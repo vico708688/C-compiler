@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
 	/* Analyse du code */
     printf("Analyse lexicale :\n-------------------------------------------------------------------------------\n");
 	lexer(&text, &tokenList);
-    printf("Analyse syntaxique :\n-------------------------------------------------------------------------------\n");
+    printf("Analyse syntaxique :\n-----------------------------------------------------------------------------\n");
 	parser(&tokenList);
 
 	freeTokens(&tokenList);

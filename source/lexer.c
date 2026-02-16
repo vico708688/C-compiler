@@ -9,12 +9,11 @@
 static int column = 0;
 static int line = 0;
 
-/* Ajoute un caractère au token voulu */
 void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE value) {
 	TOKEN token = { .type = type, .value = value, .line = line, .column = column };
 	
 	if (tokenList->indexToken >= tokenList->size) {
-		TOKEN *tmp = NULL; /* temporary buffer for realloc */
+		TOKEN *tmp = NULL;
 		tokenList->size *= 2;
 		tmp = realloc(tokenList->tokens, tokenList->size * sizeof(TOKEN));
 		if (tmp == NULL) {
@@ -220,4 +219,5 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 	* compléter la liste des keywords (pas hardcoder)
 	* enlever les static pour multithreading
 	* mettre en regex les opérateurs ?
+	* vérifier l'utilisation des unions
 */

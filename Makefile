@@ -5,8 +5,8 @@ INC = include
 SOURCES := $(wildcard $(SRC)/*.c)
 OBJECTS := $(patsubst $(SRC)/%.c, $(DST)/%.o, $(SOURCES))
 
-lexer: $(OBJECTS)
-	@gcc -o $(DST)/lexer $(OBJECTS)
+main: $(OBJECTS)
+	@gcc -o $(DST)/main $(OBJECTS)
 
 $(DST)/%.o: $(SRC)/%.c | $(DST)
 	@gcc -c $< -o $@ -I$(INC)
@@ -17,4 +17,4 @@ $(DST):
 .PHONY: clean
 
 clean:
-	@rm -rf $(DST)/*.o $(DST)/lexer
+	@rm -rf $(DST)/*.o $(DST)/main

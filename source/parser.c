@@ -7,29 +7,36 @@
 #include "utils.h"
 
 /**
-* @brief Retourne le k-ième token de la liste sans l'enlever de la liste.
+* @brief Retourne le k-ième token de la liste sans le consommer.
 */
-TOKEN show_next(TOKEN_LIST* tokenList, int k) {
-    return tokenList->tokens[0];
+TOKEN showNextToken(TOKEN_LIST* tokenList, int k) {
+    return tokenList->tokens[k];
 }
 
 /**
 * @brief Consomme le token courant en l'enlevant de la liste.
 */
-void accept(TOKEN_LIST* tokenList) {
-    return;
+void acceptToken(TOKEN_LIST* tokenList) {
+    tokenList++;
 }
 
 /**
 * @brief consomme le lexème courant s’il est du bon type (kind). Sinon
 * retourne une erreur à l’utilisateur en indiquant la ligne et la colonne d’erreur.
 */
-void expect(TOKEN_LIST* tokenList, enum TOKEN_TYPE tokenType) {
-    return;
+void expectToken(TOKEN_LIST* tokenList, enum TOKEN_TYPE tokenType) {
+    TOKEN token = showNextToken(tokenList, 0);
+    if (token.type == tokenType) {
+        acceptToken(tokenList);
+    }
+    else {
+        printf("Syntax error line %d, column %d. Expected %d, got %d", token.line, token.column, tokenType, token.type);
+        exit(0); /* A enlever : correction d'erreurs multiples */
+    }
 }
 
 /**
-* @brief Analyse récursive descendente LL(2).
+* @brief Analyse récursive descendante LL(1).
 */
 void parser(TOKEN_LIST* tokenList) {
     return;

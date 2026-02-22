@@ -12,6 +12,7 @@ enum TOKEN_TYPE {
 
 union TOKEN_VALUE {
         char* value_str;
+		char value_chr;
         int value_int;
 };
 

@@ -29,8 +29,8 @@ void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE val
 
 /* Changer l'implémentation du test de valeur des tokens */
 int canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value) {
-	if ((strcmp(value.value_str, "main") == 0) ||
-		(strcmp(value.value_str, "int") == 0) ||
+	if ((strcmp(value.value_str, "int") == 0) ||
+		(strcmp(value.value_str, "void") == 0) ||
 		(strcmp(value.value_str, "while") == 0) ||
 		(strcmp(value.value_str, "if") == 0) ||
 		(strcmp(value.value_str, "for") == 0)) {
@@ -137,24 +137,32 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 		union TOKEN_VALUE value = { 0 };
 		switch (**text) {
 			/* OPERATOR */
-			case '+': value.value_str = "+"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			case '-': value.value_str = "-"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			case '=': value.value_str = "="; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			case '<': value.value_str = "<"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			case '>': value.value_str = ">"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			case '%': value.value_str = "%"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			case '!': value.value_str = "!"; addToken(tokenList, OPERATOR, value); advance(text, 1); break;
-			
+			case '+': // fall-through
+			case '-':
+			case '=':
+			case '<':
+			case '>':
+			case '%':
+			case '!':
+				value.value_chr = **text;
+				addToken(tokenList, OPERATOR, value);
+				advance(text, 1);
+				break;
+
 			/* PONCTUATION */
-			case ';': value.value_str = ";"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case ',': value.value_str = ","; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case '.': value.value_str = "."; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case '(': value.value_str = "("; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case ')': value.value_str = ")"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case '}': value.value_str = "}"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case '{': value.value_str = "{"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case ']': value.value_str = "]"; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
-			case '[': value.value_str = "["; addToken(tokenList, PONCTUATION, value); advance(text, 1); break;
+			case ';': // fall-through
+			case ',':
+			case '.':
+			case '(':
+			case ')':
+			case '}':
+			case '{':
+			case ']':
+			case '[':
+				value.value_chr = **text;
+				addToken(tokenList, PONCTUATION, value);
+				advance(text, 1);
+				break;
 
 			/* STRINGS + NUMBERS + IDENTIFIERS + KEYWORDS */
 			default:
@@ -164,7 +172,7 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 					advance(text, 1); /* Enlève le premier '"' */
 					value.value_str = getString(text, lenToken - 2); /* -2 : récupère l'interieur de la chaine de caractères */
 					addToken(tokenList, STRING, value);
-					advance(text, lenToken); /* Consomme le reste de la string */
+					advance(text, lenToken); /* Consomme la chaine de caractères complète */
 				}
 				/* NUMBERS */
 				else if (isNumber(text, &lenToken, &(regexes.number))) {
@@ -190,7 +198,7 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 		}
 	}
 
-	/* DEBUG */
+	#ifndef DEBUG
 	printf("Liste des tokens (%d tokens):\n\n", tokenList->indexToken);
 	char* tokenType;
 	for (int i = 0; i < tokenList->indexToken; i++) {
@@ -206,11 +214,15 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 		if (token.type == 5) {
 			printf("#%d, TYPE: %s, VALUE: %d, LINE: %d, COLUMN: %d\n", i, tokenType, token.value.value_int, token.line, token.column);
 		}
+		else if (token.type == 0 || token.type == 3) {
+			printf("#%d, TYPE: %s, VALUE: %s, LINE: %d, COLUMN: %d\n", i, tokenType, (char[]){token.value.value_chr, '\0'}, token.line, token.column);
+		}
 		else {
 			printf("#%d, TYPE: %s, VALUE: %s, LINE: %d, COLUMN: %d\n", i, tokenType, token.value.value_str, token.line, token.column);
 		}
 	}
 	printf("\n");
+	#endif
 
 	freeRegexes(&regexes);
 }

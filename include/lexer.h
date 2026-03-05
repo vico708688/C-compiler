@@ -2,20 +2,20 @@
 #define H_LEXER
 
 #include "token.h"
+
+#include <stdbool.h>
 #include <regex.h>
 
-void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE value);
-int canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value);
+void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE value, bool ownstr);
+bool canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value);
 
-int isAtEnd(char** text);
-int isAtNewLine(char** text);
+bool isAtEnd(char** text);
+bool isAtNewLine(char** text);
 
-int isString(char** text, int* lenToken, regex_t* regex);
-int isNumber(char** text, int* lenToken, regex_t* regex);
-int isCharac(char** text, int* lenToken, regex_t* regex);
+bool isType(char** text, int* lenToken, regex_t* regex);
 
-char* getString(char** text, int lenToken);
-int getNumber(char** text, int lenToken);
+int getInteger(char** text, int lenToken);
+float getFloat(char** text, int lenToken);
 char* getChar(char** text, int lenToken);
 
 void lexer(char** text, TOKEN_LIST *tokenList);

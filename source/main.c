@@ -18,9 +18,13 @@ int main(int argc, char* argv[]) {
 	TOKEN_LIST tokenList = initTokenList(&text);
 
 	/* Analyse du code */
+	#ifdef DEBUG
     printf("Analyse lexicale :\n-------------------------------------------------------------------------------\n");
+	#endif
 	lexer(&text, &tokenList);
+	#ifdef DEBUG
     printf("Analyse syntaxique :\n-----------------------------------------------------------------------------\n");
+	#endif
 	parser(&tokenList);
 
 	freeTokens(&tokenList);

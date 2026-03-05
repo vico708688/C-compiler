@@ -7,7 +7,9 @@
 
 typedef struct {
     regex_t string;
-    regex_t number;
+    regex_t integer;
+    regex_t floating;
+    regex_t comment;
     regex_t charac;
 } regexList;
 

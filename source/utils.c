@@ -27,25 +27,30 @@ char* read_file(FILE* fd) {
 }
 
 void freeTokens(TOKEN_LIST *tokenList) {
-	for (int i = 0; i < tokenList->indexToken; i++) {
-		if ((tokenList->tokens[i].type == STRING) |
-			(tokenList->tokens[i].type == IDENTIFIER) |
-			(tokenList->tokens[i].type == KEYWORD)) {
-			free(tokenList->tokens[i].value.value_str);
-		}
+	for (int i = 0; i < tokenList->size; i++) {
+		if (tokenList->tokens[i].ownstr) {
+            free(tokenList->tokens[i].value.value_str);
+        }
 	}
 	free(tokenList->tokens);
 }
 
 void freeRegexes(regexList* regexes) {
-	regfree(&(regexes->number));
-	regfree(&(regexes->string));
+	regfree(&(regexes->integer));
+	regfree(&(regexes->floating));
+	regfree(&(regexes->comment));
 	regfree(&(regexes->charac));
 }
 
 char* extractSubString(char** string, int len) {
 	/* Allocation sur la heap pour pouvoir sauvegarder cette donnée (+1 pour le '\0') */
-	char* subString = calloc(len + 1, sizeof(char));
+	char* subString = malloc((len + 1) * sizeof(char));
+	if (subString == NULL)
+	{
+		perror("Error malloc\n");
+		exit(1);
+	}
+	
 
 	/* Copie de la string d'origine troncatée à la bonne longueur dans subString */
 	strncpy(subString, *string, len);
@@ -57,18 +62,23 @@ char* extractSubString(char** string, int len) {
 }
 
 void initRegexes(regexList* regexes) {
-	if(regcomp(&(regexes->number), "^[0-9]+", REG_EXTENDED)) {
-		perror("Error regcomp number\n");
+	if(regcomp(&(regexes->floating), "^([0-9]+\\.[0-9]+)", REG_EXTENDED)) {
+		perror("Error regcomp float\n");
 		exit(1);
 	}
 
-	if(regcomp(&(regexes->string), "^\"[^\"\n]*\"", REG_EXTENDED)) {
-		perror("Error regcomp string\n");
+	if(regcomp(&(regexes->integer), "^[+-]?[0-9]+", REG_EXTENDED)) {
+		perror("Error regcomp integer\n");
+		exit(1);
+	}
+
+	if(regcomp(&(regexes->comment), "^\\/\\/.*", REG_EXTENDED)) {
+		perror("Error regcomp comment\n");
 		exit(1);
 	}
 
 	if(regcomp(&(regexes->charac), "^[[:alpha:]][a-zA-Z_0-9]*", REG_EXTENDED)) {
-		perror("Error regcomp charac\n");
+		perror("Error regcomp character\n");
 		exit(1);
 	}
 }

@@ -46,6 +46,7 @@ enum TOKEN_TYPE {
 	// Identifiers & Integers
 	IDENTIFIER,
 	INT_NUMBER,
+	STRING,
 	FLOAT_NUMBER
 };
 
@@ -54,6 +55,7 @@ union TOKEN_VALUE {
 	char value_chr;
 	int value_int;
 	float value_float;
+	bool value_bool;
 };
 
 typedef struct {

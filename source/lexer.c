@@ -61,11 +61,13 @@ bool canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value) {
 		return true;
 	}
 	else if (strcmp(value.value_str, "false") == 0) {
-		addToken(tokenList, KW_FALSE, value, true);
+		value.value_bool = false;
+		addToken(tokenList, KW_FALSE, value, false);
 		return true;
 	}
 	else if (strcmp(value.value_str, "true") == 0) {
-		addToken(tokenList, KW_TRUE, value, true);
+		value.value_bool = true;
+		addToken(tokenList, KW_TRUE, value, false);
 		return true;
 	}
 	return false;

@@ -3,14 +3,15 @@
 
 #include <stdbool.h>
 
-enum TOKEN_TYPE {
+typedef enum type_t {
 	// Comments
 	COMMENT,
 	// Variable type
-	TYPE_INT,
-	TYPE_BOOL,
-	TYPE_FLOAT,
-	TYPE_CHAR,
+	TK_INT,
+	TK_BOOL,
+	TK_FLOAT,
+	TK_CHAR,
+	TK_ARRAY,
 	// Keywords
 	KW_MAIN,
 	KW_FALSE,
@@ -48,7 +49,7 @@ enum TOKEN_TYPE {
 	INT_NUMBER,
 	STRING,
 	FLOAT_NUMBER
-};
+} type_t;
 
 union TOKEN_VALUE {
 	char* value_str;
@@ -59,7 +60,7 @@ union TOKEN_VALUE {
 };
 
 typedef struct {
-	enum TOKEN_TYPE type;
+	enum type_t type;
 	union TOKEN_VALUE value;
 	bool ownstr;
 	int line;

@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <regex.h>
 
-void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE value, bool ownstr);
+void addToken(TOKEN_LIST *tokenList, enum type_t type, union TOKEN_VALUE value, bool ownstr);
 bool canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value);
 
 bool isAtEnd(char** text);

@@ -9,7 +9,7 @@
 static int column = 0;
 static int line = 0;
 
-void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE value, bool ownstr) {
+void addToken(TOKEN_LIST *tokenList, enum type_t type, union TOKEN_VALUE value, bool ownstr) {
 	TOKEN token = { .type = type, .value = value, .line = line, .column = column, .ownstr = ownstr };
 	
 	if (tokenList->indexToken >= tokenList->size) {
@@ -29,19 +29,19 @@ void addToken(TOKEN_LIST *tokenList, enum TOKEN_TYPE type, union TOKEN_VALUE val
 
 bool canAddKeywordToken(TOKEN_LIST *tokenList, union TOKEN_VALUE value) {
 	if (strcmp(value.value_str, "int") == 0) {
-		addToken(tokenList, TYPE_INT, value, true);
+		addToken(tokenList, TK_INT, value, true);
 		return true;
 	}
 	else if (strcmp(value.value_str, "bool") == 0) {
-		addToken(tokenList, TYPE_BOOL, value, true);
+		addToken(tokenList, TK_BOOL, value, true);
 		return true;
 	}
 	else if (strcmp(value.value_str, "float") == 0) {
-		addToken(tokenList, TYPE_FLOAT, value, true);
+		addToken(tokenList, TK_FLOAT, value, true);
 		return true;
 	}
 	else if (strcmp(value.value_str, "char") == 0) {
-		addToken(tokenList, TYPE_CHAR, value, true);
+		addToken(tokenList, TK_CHAR, value, true);
 		return true;
 	}
 	else if (strcmp(value.value_str, "main") == 0) {
@@ -133,9 +133,6 @@ void advance(char** text, int nb) {
 */
 void lexer(char** text, TOKEN_LIST *tokenList) {
 	int lenToken = 0;
-	/* Allocation sur la pile (variable locale).
-	*  Avant, j'avais écrit : regexList* regexes; ceci allouait sur le tas sans initialiser avec calloc -> pointe nulle part.
-	*/
 	regexList regexes;
 	initRegexes(&regexes);
 
@@ -176,8 +173,9 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			case '=': {
 				bool is_equal = ((*text)[1] == '=');
 
-				if (is_equal)
+				if (is_equal) {
 					value.value_str = "==";
+				}
 				else
 					value.value_chr = '=';
 
@@ -192,8 +190,9 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			case '<': {
 				bool is_lte = ((*text)[1] == '=');
 
-				if (is_lte)
+				if (is_lte) {
 					value.value_str = "<=";
+				}
 				else
 					value.value_chr = '<';
 
@@ -208,8 +207,9 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			case '>': {
 				bool is_gte = ((*text)[1] == '=');
 
-				if (is_gte)
+				if (is_gte) {
 					value.value_str = ">=";
+				}
 				else
 					value.value_chr = '>';
 
@@ -230,8 +230,9 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 			case '!': {
 				bool is_ne = ((*text)[1] == '=');
 
-				if (is_ne)
+				if (is_ne) {
 					value.value_str = "!=";
+				}
 				else
 					value.value_chr = '!';
 
@@ -241,6 +242,44 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 						ownstr);
 
 				advance(text, is_ne ? 2 : 1);
+				break;
+			}
+			case '&': {
+				bool is_and = ((*text)[1] == '&');
+
+				if (is_and) {
+					value.value_str = "&&";
+				}
+				else {
+					printf("Unknown caracter: %c, at line %d, column %d.\n", **text, line, column);
+					exit(1);
+				}
+
+				addToken(tokenList,
+						is_and,
+						value,
+						ownstr);
+
+				advance(text, 2);
+				break;
+			}
+			case '|': {
+				bool is_or = ((*text)[1] == '|');
+
+				if (is_or) {
+					value.value_str = "||";
+				}
+				else {
+					printf("Unknown caracter: %c, at line %d, column %d.\n", **text, line, column);
+					exit(1);
+				}
+
+				addToken(tokenList,
+						is_or,
+						value,
+						ownstr);
+
+				advance(text, 2);
 				break;
 			}
 
@@ -325,6 +364,9 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 		}
 		else if (token.type == 34) {
 			printf("#%d, TYPE: %d, VALUE: %d, LINE: %d, COLUMN: %d\n", i, token.type, token.value.value_int, token.line, token.column);
+		}
+		else if (token.type == 7 || token.type == 8) {
+			printf("#%d, TYPE: Bool, VALUE: %d, LINE: %d, COLUMN: %d\n", i, token.value.value_bool, token.line, token.column);
 		}
 		else {
 			printf("#%d, TYPE: %d, VALUE: %f, LINE: %d, COLUMN: %d\n", i, token.type, token.value.value_float, token.line, token.column);

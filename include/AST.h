@@ -4,205 +4,112 @@
 #include "stdbool.h"
 #include "token.h"
 
-/* --------------------------------------- Forward Declaration --------------------------------------- */
+// Statement :
+//      Body of a function.
+//      Indicates that the program is to take a particular action in the order speci-
+//      fied, such as computing a value, performing a loop, or choosing between
+//      branches of an alternative. A statement can also be a declaration of a local
+//      variable.
+// Declaration :
+//      States the existence of a variable or a function
+// Expression :
+//      Assignement d'une valeur
 
-typedef struct Decl Decl;
-typedef struct ElseStmt ElseStmt;
-typedef struct IfStmt IfStmt;
-typedef struct Parenth Parenth;
-typedef struct Primary Primary;
-typedef struct Factor Factor;
-typedef struct Term Term;
-typedef struct Addition Addition;
-typedef struct Relation Relation;
-typedef struct Equal Equal;
-typedef struct Conj Conj;
-typedef struct Expr Expr;
-typedef struct Asmt Asmt;
 typedef struct Stmt Stmt;
-typedef struct Program Program;
 
-/* --------------------------------------- Définition des types -------------------------------------- */
+// -------------------------------------- Expression structure --------------------------------------
+typedef enum {
+    EXPR_BINARY,
+    EXPR_UNARY,
+    EXPR_LITERAL,
+    EXPR_IDENTIFIER,
+    EXPR_ARRAY
+} ExprType;
 
-typedef enum AST_Equop
-{
-    AST_EQUALITY,
-    AST_INEQUALITY
-} AST_Equop;
+typedef struct Expr Expr;
 
-typedef enum AST_Relop
-{
-    AST_LT,
-	AST_LTE,
-	AST_GT,
-	AST_GTE
-} AST_Relop;
+struct Expr {
+    ExprType type;
 
-typedef enum AST_Addop
-{
-    AST_ADDITION,
-	AST_SUBTRACTION
-} AST_Addop;
+    union {
+        struct {
+            Expr* left;
+            Expr* right;
+            enum type_t op;
+        } binary;
 
-typedef enum AST_Mulop
-{
-    AST_MULTIPLICATION,
-	AST_DIVISION,
-	AST_MODULO
-} AST_Mulop;
+        struct {
+            enum type_t op;
+            Expr* operand;
+        } unary;
 
-typedef enum AST_Unaryop
-{
-    AST_MINUS,
-    AST_NOT
-} AST_Unaryop;
+        struct {
+            char* name;
+        } identifier;
 
-typedef enum Stmt_type
-{
-    ASSIGNMENT,
-    IF_STATEMENT,
-    WHILE_STATEMENT
-} Stmt_type;
+        struct {
+            char* name;
+            Expr* index;
+        } array;
 
-typedef enum Primary_type
-{
-    PRIMARY_IDENTIFIER,
-    PRIMARY_ARRAY_ACCESS,
-    PRIMARY_LITERAL,
-    PRIMARY_PARENTHESIZED_EXPRESSION
-} Primary_type;
+        struct {
+            enum type_t value_type;
+            union TOKEN_VALUE value;
+        } literal;
+    };
+};
 
-/* ------------------------------------ Définition de la grammaire ------------------------------------*/
-
-typedef struct Decl
-{
-    enum TOKEN_TYPE type;
+// ------------------------------------ Declaration structure ---------------------------------------
+typedef struct {
+    enum type_t type;
     char* id;
-    bool is_array;
-    int length;
+    Stmt* code; // Only used by functions
 } Decl;
 
-typedef struct ElseStmt
-{
-    int nb_stmt;
-    Stmt** stmt;
-} ElseStmt;
+// -------------------------------------- Statement structure ---------------------------------------
+typedef enum {
+    STMT_DECL,
+    STMT_ASSIGN,
+    STMT_IF_ELSE,
+    STMT_WHILE,
+    STMT_BLOCK,
+    STMT_RETURN
+} stmt_t;
 
-typedef struct IfStmt
-{
-    Expr* expr;
-    int nb_stmt;
-    Stmt** stmt;
-    bool contains_elseStmt;
-    ElseStmt* else_stmt;
-} IfStmt;
-
-typedef struct WhileStmt
-{
-    Expr* expr;
-    int nb_stmt;
-    Stmt** stmt;
-} WhileStmt;
-
-typedef struct Parenth
-{
-    Expr* expr;
-} Parenth;
-
-typedef struct Primary
-{
-    enum Primary_type type;
-    union
-    {
-        struct
-        {
-            char* id;
-            Expr* expr;
-        } identifier;
-        enum TOKEN_TYPE value_type;
-        union TOKEN_VALUE value;
-        Parenth* parent;
-    };
-} Primary;
-
-typedef struct Factor
-{
-    bool contains_unaryop;
-    AST_Unaryop unaryop;
-    Primary* primary;
-} Factor;
-
-typedef struct Term
-{
-    Factor* factor;
-    AST_Mulop* mulop;
-    int nb_factor;
-    Factor** rfactor;
-} Term;
-
-typedef struct Addition
-{
-    Term* term;
-    AST_Addop* addop;
-    int nb_term;
-    Term** rterm;
-} Addition;
-
-typedef struct Relation
-{
-    Addition* laddition;
-    bool contains_laddition;
-    AST_Relop relop;
-    Addition* raddition;
-} Relation;
-
-typedef struct Equal
-{
-    Relation* lrelation;
-    bool contains_lequal;
-    AST_Equop equop;
-    Relation* rrelation;
-} Equal;
-
-typedef struct Conj
-{
-    Equal* lequal;
-    int nb_requal;
-    Equal** requal;
-} Conj;
-
-typedef struct Expr
-{
-    Conj* lconj;
-    int nb_rconj;
-    Conj** rconj;
-} Expr;
-
-typedef struct Asmt
-{
+typedef struct {
     char* id;
     bool contains_lexpr;
     Expr* lexpr;
     Expr* rexpr;
 } Asmt;
 
-typedef struct Stmt
-{
-    enum Stmt_type type;
-    union
-    {
-        Asmt* asmt;
-        IfStmt* if_stmt;
-        WhileStmt* while_stmt;
-    };
-} Stmt;
+typedef struct {
+    Expr* condition;
+    Stmt* body;
+} WhileStmt;
 
-typedef struct Program
-{
-    int nb_decl;
-    int nb_stmt;
-    Decl** decl;
-    Stmt** stmt;
+typedef struct {
+    Expr* condition;
+    Stmt* then_branch;
+    bool contains_else_stmt;
+    Stmt* else_branch;
+} IfStmt;
+
+struct Stmt {
+    stmt_t type;
+    Decl* decl;
+    Asmt* asmt;
+    Expr* init_expr; // Used for "for loop"
+    Expr* expr;      // Used for "for loop" and "while loop" and "if/else loop"
+    Expr* next_expr; // Used for "for loop"
+    Stmt* body;      // Used for "for loop" and "while loop" and "if/else loop"
+    Stmt* else_body; // Used for "if/else loop"
+    Stmt* next;
+};
+
+// -------------------------------------- Program structure -----------------------------------------
+typedef struct {
+    Decl* decl;
 } Program;
 
 #endif

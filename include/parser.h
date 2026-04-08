@@ -5,27 +5,41 @@
 #include "stdbool.h"
 #include "AST.h"
 
+void parser(TOKEN_LIST* tokenList);
+
 TOKEN showNextToken(TOKEN_LIST* tokenList);
 TOKEN acceptToken(TOKEN_LIST* tokenList);
-TOKEN expectToken(TOKEN_LIST* tokenList, enum TOKEN_TYPE tokenType);
+TOKEN expectToken(TOKEN_LIST* tokenList, enum type_t tokenType);
 
+// ------------------------------------------- Program parsing ----------------------------------------------
 Program* parseProgram(TOKEN_LIST* tokenList);
-Decl* parseDeclaration(TOKEN_LIST *tokenList);
-Stmt* parseStatement(TOKEN_LIST *tokenList);
-Asmt* parseAssignment(TOKEN_LIST *tokenList);
-IfStmt* parseIfStatement(TOKEN_LIST *tokenList);
-ElseStmt* parseElseStatement(TOKEN_LIST *tokenList);
-WhileStmt* parseWhileStatement(TOKEN_LIST *tokenList);
-Expr* parseExpression(TOKEN_LIST *tokenList);
-Conj* parseConjunction(TOKEN_LIST *tokenList);
-Equal* parseEquality(TOKEN_LIST *tokenList);
-Relation* parseRelation(TOKEN_LIST *tokenList);
-Addition* parseAddition(TOKEN_LIST *tokenList);
-Term* parseTerm(TOKEN_LIST *tokenList);
-Factor* parseFactor(TOKEN_LIST *tokenList);
-Primary* parsePrimary(TOKEN_LIST *tokenList);
-Parenth* parseParenth(TOKEN_LIST *tokenList);
+Decl* decl_create(enum type_t type, char* id, Stmt* code);
 
-void parser(TOKEN_LIST* tokenList);
+// ------------------------------------------- Expression parsing -------------------------------------------
+Expr* parseExpression(TOKEN_LIST *tokenList);
+
+Expr* parseConjunction(TOKEN_LIST *tokenList);
+Expr* parseEquality(TOKEN_LIST *tokenList);
+Expr* parseRelation(TOKEN_LIST *tokenList);
+Expr* parseAddition(TOKEN_LIST *tokenList);
+Expr* parseTerm(TOKEN_LIST *tokenList);
+Expr* parseFactor(TOKEN_LIST *tokenList);
+Expr* parsePrimary(TOKEN_LIST *tokenList);
+Expr* parseParenth(TOKEN_LIST *tokenList);
+
+// ------------------------------------------- Statement parsing --------------------------------------------
+Stmt* stmt_create(stmt_t kind, Decl *decl, Asmt* asmt, Expr *init_expr, Expr *expr, Expr *next_expr, Stmt *body, Stmt *else_body, Stmt *next);
+Stmt* parseStatement(TOKEN_LIST *tokenList);
+
+Decl* parseDeclaration(TOKEN_LIST *tokenList);
+IfStmt* parseIfStatement(TOKEN_LIST *tokenList);
+WhileStmt* parseWhileStatement(TOKEN_LIST *tokenList);
+Asmt* parseAssignment(TOKEN_LIST *tokenList);
+
+// -------- DEBUG ----------
+void printIndent(int indent);
+void printExpr(Expr* expr, int indent);
+void printStmt(Stmt* stmt, int indent);
+void printProgram(Program* program);
 
 #endif

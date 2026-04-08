@@ -1,26 +1,73 @@
-# MiniC-compiler
+# MiniC Compiler
 
-## How to compile
+A simple compiler for a subset of the C language (MiniC).  
+This project performs **lexical and syntax analysis** of MiniC source files.
 
-* In debug mode, run:  
+---
 
-`make debug`  
+## Requirements
 
-It will print the results of syntax and lexical analysis.
+Make sure the following tools are installed:
 
-* In normal mode, run:
+- `gcc` or `clang`
+- `make`
 
-`make`
+---
 
-There are no flags for now.
+## Build
 
+### Debug mode
 
-## How to use
+Compile the project in debug mode:
 
-To analyse a mini-C code, run:  
+```bash
+make debug
+```
 
-`./build/main <file.mc>`
+This mode prints the results of **lexical analysis** and **syntax analysis**.
 
-## TODO
+### Normal mode
 
-AST
+Compile the project normally:
+
+```bash
+make
+```
+
+Currently, no additional compilation flags are available.
+
+---
+
+## Usage
+
+To analyze a MiniC source file:
+
+```bash
+./build/main <file.mc>
+```
+
+Example:
+
+```bash
+./build/main source_code/code.mc
+```
+
+---
+
+## Project Structure
+
+```
+.
+├── build/          # Compiled binaries
+├── source/         # Source code
+├── include/        # Headers
+├── Makefile
+└── README.md
+```
+
+---
+
+## Notes
+
+- The compiler currently supports **basic MiniC syntax analysis**.
+- Additional features will be added in future versions.

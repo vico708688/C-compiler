@@ -29,7 +29,7 @@ TOKEN acceptToken(TOKEN_LIST* tokenList) {
 * @brief consomme le lexème courant s’il est du bon type (kind). Sinon
 * retourne une erreur à l’utilisateur en indiquant la ligne et la colonne d’erreur.
 */
-TOKEN expectToken(TOKEN_LIST* tokenList, enum TOKEN_TYPE tokenType) {
+TOKEN expectToken(TOKEN_LIST* tokenList, enum type_t tokenType) {
     TOKEN token = showNextToken(tokenList);
     if (token.type != tokenType) {
         printf("Syntax error line %d, column %d. Expected %d, got %d.\n", token.line, token.column, tokenType, token.type);
@@ -47,6 +47,8 @@ void parser(TOKEN_LIST* tokenList) {
 
     /* TODO : remove comments */
     Program *program = parseProgram(tokenList);
+
+    printProgram(program);
 }
 
 // ------------------------------------ Méthodes de parsing ----------------------------------------
@@ -59,6 +61,7 @@ void printDebug(char* string) {
 }
 #endif
 
+// ------------------------------------------- Program parsing ----------------------------------------------
 Program* parseProgram(TOKEN_LIST* tokenList) {
     Program *program = malloc(sizeof(Program));
     if (program == NULL)
@@ -66,49 +69,477 @@ Program* parseProgram(TOKEN_LIST* tokenList) {
         perror("Error program malloc.\n");
         exit(EXIT_FAILURE);
     }
-    program->nb_decl = 0;
-    program->nb_stmt = 0;
     
     #ifdef DEBUG
     printDebug("Entering program");
     tabs++;
     #endif
-    expectToken(tokenList, TYPE_INT);
+    expectToken(tokenList, TK_INT);
     expectToken(tokenList, KW_MAIN);
     expectToken(tokenList, L_PAREN);
     expectToken(tokenList, R_PAREN);
     expectToken(tokenList, L_CURL_BRACKET);
-    enum TOKEN_TYPE nextTokenType = showNextToken(tokenList).type;
+    
+    Decl *main_func = decl_create(TK_INT, "main", NULL);
+    program->decl = main_func;
+
+    Stmt* head = NULL;        // début de la liste
+    Stmt* tail = NULL;        // fin de la liste
+    
+    enum type_t nextTokenType = showNextToken(tokenList).type;   
+
     while (nextTokenType != R_CURL_BRACKET) {
-        if (nextTokenType == TYPE_INT ||
-            nextTokenType == TYPE_FLOAT ||
-            nextTokenType == TYPE_BOOL ||
-            nextTokenType == TYPE_CHAR) {
-            #ifdef DEBUG
-            printDebug("parsing declaration");
-            tabs++;
-            #endif
-            program->decl = realloc(program->decl, sizeof(Decl*) * (program->nb_decl + 1));
-            program->decl[program->nb_decl] = parseDeclaration(tokenList);
-            program->nb_decl++;
+        Stmt* new_stmt = parseStatement(tokenList);
+        new_stmt->next = NULL;
+
+        if (head == NULL) // initialisation de la liste chainée
+        {
+            head = new_stmt;
+            tail = new_stmt;
         }
-        else {
-            #ifdef DEBUG
-            printDebug("parsing statement");
-            tabs++;
-            #endif
-            program->stmt = realloc(program->stmt, sizeof(Stmt*) * (program->nb_stmt + 1));
-            program->stmt[program->nb_stmt] = parseStatement(tokenList);
-            program->nb_stmt++;
+        else
+        {
+            tail->next = new_stmt;
+            tail = new_stmt;
         }
+
         nextTokenType = showNextToken(tokenList).type;
+    }
+    expectToken(tokenList, R_CURL_BRACKET);
+
+    main_func->code = head;
+
+    #ifdef DEBUG
+    printf("\n");
+    tabs--;
+    #endif
+
+    return program;
+}
+
+Decl* decl_create(enum type_t type, char* id, Stmt* code) {
+    Decl* decl = malloc(sizeof(Decl));
+    decl->type = type;
+    decl->id = id;
+    decl->code = code;
+    return decl;
+}
+
+// ------------------------------------------- Expression parsing ----------------------------------------------
+Expr* newBinaryExpr(Expr* left, enum type_t op, Expr* right) {
+    Expr *expr = malloc(sizeof(Expr));
+    if (expr == NULL)
+    {
+        perror("Error binary expression malloc.\n");
+        exit(EXIT_FAILURE);
+    }
+    expr->type = EXPR_BINARY;
+    expr->binary.left = left;
+    expr->binary.op = op;
+    expr->binary.right = right;
+    return expr;
+}
+
+Expr* newUnaryExpr(Expr* expression, enum type_t op) {
+    Expr *expr = malloc(sizeof(Expr));
+    if (expr == NULL)
+    {
+        perror("Error binary expression malloc.\n");
+        exit(EXIT_FAILURE);
+    }
+    expr->type = EXPR_BINARY;
+    expr->unary.op = op;
+    expr->unary.operand = expression;
+    return expr;
+}
+
+Expr* parseExpression(TOKEN_LIST* tokenList) {
+    #ifdef DEBUG
+    printDebug("parsing conjunction");
+    tabs++;
+    #endif
+    Expr* e1 = parseConjunction(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+
+    while (showNextToken(tokenList).type == OR) {
+        acceptToken(tokenList);
+        #ifdef DEBUG
+        printDebug("parsing conjunction");
+        tabs++;
+        #endif
+        enum type_t op = OR;
+        Expr* e2 = parseConjunction(tokenList);
+        e1 = newBinaryExpr(e1, op, e2);
         #ifdef DEBUG
         tabs--;
         #endif
     }
-    expectToken(tokenList, R_CURL_BRACKET);
 
-    return program;
+    return e1;
+}
+
+Expr* parseConjunction(TOKEN_LIST* tokenList) {
+    #ifdef DEBUG
+    printDebug("parsing equality");
+    tabs++;
+    #endif
+    Expr* e1 = parseEquality(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+
+    while (showNextToken(tokenList).type == AND) {
+        acceptToken(tokenList);
+        #ifdef DEBUG
+        printDebug("parsing equality");
+        tabs++;
+        #endif
+        enum type_t op = AND;
+        Expr* e2 = parseEquality(tokenList);
+        e1 = newBinaryExpr(e1, op, e2);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+    }
+
+    return e1;
+}
+
+Expr* parseEquality(TOKEN_LIST* tokenList) {
+    #ifdef DEBUG
+    printDebug("parsing relation");
+    tabs++;
+    #endif
+    Expr* e1 = parseRelation(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+    
+    TOKEN nextToken = showNextToken(tokenList);
+    if (nextToken.type == EQUALITY ||
+        nextToken.type == INEQUALITY)
+    {
+        acceptToken(tokenList);
+        #ifdef DEBUG
+        printDebug("parsing relation");
+        tabs++;
+        #endif
+        Expr* e2 = parseRelation(tokenList);
+        e1 = newBinaryExpr(e1, nextToken.type, e2);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+    }
+    return e1;
+}
+    
+Expr* parseRelation(TOKEN_LIST* tokenList) {
+    #ifdef DEBUG
+    printDebug("parsing addition");
+    tabs++;
+    #endif
+    Expr* e1 = parseAddition(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+    
+    TOKEN nextToken = showNextToken(tokenList);
+    if (nextToken.type == LT ||
+        nextToken.type == LTE ||
+        nextToken.type == GT ||
+        nextToken.type == GTE)
+    {
+        acceptToken(tokenList);
+        #ifdef DEBUG
+        printDebug("parsing addition");
+        tabs++;
+        #endif
+        Expr* e2 = parseAddition(tokenList);
+        e1 = newBinaryExpr(e1, nextToken.type, e2);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+    }
+
+    return e1;
+}
+
+Expr* parseAddition(TOKEN_LIST* tokenList) {
+    #ifdef DEBUG
+    printDebug("parsing term");
+    tabs++;
+    #endif
+    Expr* e1 = parseTerm(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+
+    TOKEN nextToken = showNextToken(tokenList);
+    while (nextToken.type == ADDITION ||
+        nextToken.type == SUBTRACTION)
+    {
+        acceptToken(tokenList);
+        #ifdef DEBUG
+        printDebug("parsing term");
+        tabs++;
+        #endif
+        Expr* e2 = parseTerm(tokenList);
+        e1 = newBinaryExpr(e1, nextToken.type, e2);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+        nextToken = showNextToken(tokenList);
+    }
+
+    return e1;
+}
+
+Expr* parseTerm(TOKEN_LIST* tokenList) {
+    #ifdef DEBUG
+    printDebug("parsing factor");
+    tabs++;
+    #endif
+    Expr* e1 = parseFactor(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+
+    TOKEN nextToken = showNextToken(tokenList);
+    while (nextToken.type == MULTIPLICATION ||
+        nextToken.type == MODULO ||
+        nextToken.type == DIVISION)
+    {
+        acceptToken(tokenList);
+        #ifdef DEBUG
+        printDebug("parsing factor");
+        tabs++;
+        #endif
+        Expr* e2 = parseTerm(tokenList);
+        e1 = newBinaryExpr(e1, nextToken.type, e2);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+        nextToken = showNextToken(tokenList);
+    }
+
+    return e1;
+}
+
+Expr* parseFactor(TOKEN_LIST* tokenList) {
+    Expr *e1 = malloc(sizeof(Expr));
+    if (e1 == NULL)
+    {
+        perror("Error factor malloc.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    TOKEN nextToken = showNextToken(tokenList);
+    if (nextToken.type == SUBTRACTION ||
+        nextToken.type == NOT)
+    {
+        acceptToken(tokenList);
+        e1->unary.op = nextToken.type;
+    }
+    #ifdef DEBUG
+    printDebug("parsing primary");
+    tabs++;
+    #endif
+    e1->unary.operand = parsePrimary(tokenList);
+    e1->type = EXPR_UNARY;
+    #ifdef DEBUG
+    tabs--;
+    #endif
+
+    return e1;
+}
+
+Expr* parsePrimary(TOKEN_LIST* tokenList) {
+    Expr *e1 = malloc(sizeof(Expr));
+    if (e1 == NULL)
+    {
+        perror("Error factor malloc.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    TOKEN nextToken = showNextToken(tokenList);
+    if (nextToken.type == IDENTIFIER) {
+        #ifdef DEBUG
+        for (int i = 0; i < tabs; i++) {
+            printf("   ");
+        }
+        printf("got identifier\n");
+        #endif
+        if (nextToken.type == L_SQ_BRACKET) {
+            expectToken(tokenList, L_SQ_BRACKET);
+            #ifdef DEBUG
+            printDebug("parsing expression for array access");
+            tabs++;
+            #endif
+            e1->array.name = expectToken(tokenList, IDENTIFIER).value.value_str;
+            e1->array.index = parseExpression(tokenList);
+            e1->type = EXPR_ARRAY;
+            #ifdef DEBUG
+            tabs--;
+            #endif
+            expectToken(tokenList, R_SQ_BRACKET);
+        }
+        else {
+            e1->identifier.name = expectToken(tokenList, IDENTIFIER).value.value_str;
+            e1->type = EXPR_IDENTIFIER;
+        }
+    }
+    /* Si le token est un literal */
+    else if (nextToken.type == INT_NUMBER ||
+        nextToken.type == FLOAT_NUMBER ||
+        nextToken.type == STRING ||
+        nextToken.type == KW_FALSE ||
+        nextToken.type == KW_TRUE)
+    {
+        acceptToken(tokenList);
+        e1->type = EXPR_UNARY;
+        if (nextToken.type == INT_NUMBER) {
+            #ifdef DEBUG
+            printDebug("got integer literal");
+            #endif
+            e1->literal.value_type = TK_INT;
+            e1->literal.value.value_int = nextToken.value.value_int;
+        }
+        else if (nextToken.type == FLOAT_NUMBER) {
+            #ifdef DEBUG
+            printDebug("got float literal");
+            #endif
+            e1->literal.value_type = TK_FLOAT;
+            e1->literal.value.value_float = nextToken.value.value_float;
+        }
+        else if (nextToken.type == KW_FALSE) {
+            #ifdef DEBUG
+            printDebug("got false boolean literal");
+            #endif
+            e1->literal.value_type = TK_BOOL;
+            e1->literal.value.value_bool = false;
+        }
+        else if (nextToken.type == KW_TRUE) {
+            #ifdef DEBUG
+            printDebug("got true boolean literal");
+            #endif
+            e1->literal.value_type = TK_BOOL;
+            e1->literal.value.value_bool = true;
+        }
+        else if (nextToken.type == STRING) {
+            #ifdef DEBUG
+            printDebug("got string literal");
+            #endif
+            e1->literal.value_type = TK_CHAR;
+            e1->literal.value.value_str = nextToken.value.value_str;
+        }
+    }
+    else if (nextToken.type == L_PAREN) {
+        #ifdef DEBUG
+        printDebug("parsing parenthesis");
+        tabs++;
+        #endif
+        Expr* expr = parseParenth(tokenList);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+        return expr;
+    }
+    else
+    {
+        if (nextToken.ownstr) {
+            printf("Expecting identifier, literal or parenthesis at line : %d, column : %d, value : %s.\n", nextToken.line, nextToken.column, nextToken.value.value_str);
+        }
+        else {
+            printf("Expecting identifier, literal or parenthesis at line : %d, column : %d, value : %s.\n", nextToken.line, nextToken.column, (char[]){nextToken.value.value_chr, '\0'});
+        }
+        exit(1);
+    }
+    
+    return e1;
+}
+
+Expr* parseParenth(TOKEN_LIST* tokenList) {
+    expectToken(tokenList, L_PAREN);
+    #ifdef DEBUG
+    printDebug("parsing expression");
+    tabs++;
+    #endif
+    Expr* e1 = parseExpression(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+    expectToken(tokenList, R_PAREN);
+
+    return e1;
+}
+
+// ------------------------------------------- Statement parsing ----------------------------------------------
+Stmt* stmt_create(stmt_t type, Decl *decl, Asmt* asmt, Expr *init_expr, Expr *expr, Expr *next_expr, Stmt *body, Stmt *else_body, Stmt *next) {
+    Stmt* stmt = malloc(sizeof(Stmt));
+    stmt->type = type;
+    stmt->decl = decl;
+    stmt->asmt = asmt;
+    stmt->init_expr = init_expr;
+    stmt->expr = expr;
+    stmt->next_expr = next_expr;
+    stmt->body = body;
+    stmt->else_body = else_body;
+    stmt->next = next;
+    return stmt;
+}
+
+Stmt* parseStatement(TOKEN_LIST* tokenList) {
+    Stmt* stmt;
+
+    enum type_t nextTokenType = showNextToken(tokenList).type;
+    if (nextTokenType == TK_INT ||
+        nextTokenType == TK_FLOAT ||
+        nextTokenType == TK_BOOL ||
+        nextTokenType == TK_CHAR) {
+        #ifdef DEBUG
+        printDebug("parsing declaration");
+        tabs++;
+        #endif
+        Decl* decl = parseDeclaration(tokenList);
+        stmt = stmt_create(STMT_DECL, decl, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    }
+    else if (nextTokenType == KW_IF) {
+        #ifdef DEBUG
+        printDebug("parsing if statement");
+        tabs++;
+        #endif
+        IfStmt* if_stmt = parseIfStatement(tokenList);
+        stmt = stmt_create(STMT_IF_ELSE, NULL, NULL, NULL, if_stmt->condition, NULL, if_stmt->then_branch, if_stmt->else_branch, NULL);
+    }
+    else if (nextTokenType == IDENTIFIER)
+    {
+        #ifdef DEBUG
+        printDebug("parsing assignment");
+        tabs++;
+        #endif
+        Asmt* asmt = parseAssignment(tokenList);
+        stmt = stmt_create(STMT_ASSIGN, NULL, asmt, NULL, NULL, NULL, NULL, NULL, NULL);
+    }
+    else if (nextTokenType == KW_WHILE)
+    {
+        #ifdef DEBUG
+        printDebug("parsing while statement");
+        tabs++;
+        #endif
+        WhileStmt* while_stmt = parseWhileStatement(tokenList);
+        stmt = stmt_create(STMT_WHILE, NULL, NULL, NULL, while_stmt->condition, NULL, while_stmt->body, NULL, NULL);
+    }
+    else
+    {
+        printf("Expecting statement (identifier, if or while)\n");
+        exit(1);
+    }
+    #ifdef DEBUG
+    tabs--;
+    #endif
+    return stmt;
 }
 
 Decl* parseDeclaration(TOKEN_LIST* tokenList) {
@@ -120,21 +551,21 @@ Decl* parseDeclaration(TOKEN_LIST* tokenList) {
     }
 
     TOKEN nextToken = showNextToken(tokenList);
-    if (nextToken.type == TYPE_INT ||
-        nextToken.type == TYPE_FLOAT ||
-        nextToken.type == TYPE_BOOL ||
-        nextToken.type == TYPE_CHAR)
+    if (nextToken.type == TK_INT ||
+        nextToken.type == TK_FLOAT ||
+        nextToken.type == TK_BOOL ||
+        nextToken.type == TK_CHAR)
     {
         acceptToken(tokenList);
         decl->type = nextToken.type;
         decl->id = expectToken(tokenList, IDENTIFIER).value.value_str;
-        if (nextToken.type == L_CURL_BRACKET)
-        {
-            expectToken(tokenList, L_CURL_BRACKET);
-            decl->is_array = true;
-            decl->length = expectToken(tokenList, INT_NUMBER).value.value_int;
-            expectToken(tokenList, R_CURL_BRACKET);
-        }
+        // TODO : ajouter array
+        // if (nextToken.type == L_CURL_BRACKET)
+        // {
+        //     expectToken(tokenList, L_CURL_BRACKET);
+        //     decl->length = expectToken(tokenList, INT_NUMBER).value.value_int;
+        //     expectToken(tokenList, R_CURL_BRACKET);
+        // }
         expectToken(tokenList, TERMINATOR);
     }
     else
@@ -146,58 +577,94 @@ Decl* parseDeclaration(TOKEN_LIST* tokenList) {
     return decl;
 }
 
-Stmt* parseStatement(TOKEN_LIST* tokenList) {
-    Stmt *stmt = malloc(sizeof(Stmt));
-    if (stmt == NULL)
+IfStmt* parseIfStatement(TOKEN_LIST* tokenList) {
+    IfStmt *if_stmt = malloc(sizeof(IfStmt));
+    if (if_stmt == NULL)
     {
-        perror("Error statement malloc.\n");
+        perror("Error if statement malloc.\n");
+        exit(EXIT_FAILURE);
+    }
+    if_stmt->contains_else_stmt = false;
+
+    expectToken(tokenList, KW_IF);
+    expectToken(tokenList, L_PAREN);
+    #ifdef DEBUG
+    printDebug("parsing expression");
+    tabs++;
+    #endif
+    if_stmt->condition = parseExpression(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+    expectToken(tokenList, R_PAREN);
+
+    expectToken(tokenList, L_CURL_BRACKET);
+    while (showNextToken(tokenList).type != R_CURL_BRACKET)
+    {
+        #ifdef DEBUG
+        printDebug("parsing statement");
+        tabs++;
+        #endif
+        if_stmt->then_branch = parseStatement(tokenList);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+    }
+    expectToken(tokenList, R_CURL_BRACKET);
+    if (showNextToken(tokenList).type == KW_ELSE)
+    {
+        expectToken(tokenList, KW_ELSE);
+        expectToken(tokenList, L_CURL_BRACKET);
+        #ifdef DEBUG
+        printDebug("parsing else statement");
+        tabs++;
+        #endif
+        if_stmt->contains_else_stmt = true;
+        if_stmt->else_branch = parseStatement(tokenList);
+        #ifdef DEBUG
+        tabs--;
+        #endif
+        expectToken(tokenList, R_CURL_BRACKET);
+    }
+
+    return if_stmt;
+}
+
+WhileStmt* parseWhileStatement(TOKEN_LIST* tokenList) {
+    WhileStmt *while_stmt = malloc(sizeof(WhileStmt));
+    if (while_stmt == NULL)
+    {
+        perror("Error while statement malloc.\n");
         exit(EXIT_FAILURE);
     }
 
-    TOKEN nextToken = showNextToken(tokenList);
-    if (nextToken.type == IDENTIFIER)
+    expectToken(tokenList, KW_WHILE);
+    expectToken(tokenList, L_PAREN);
+    #ifdef DEBUG
+    printDebug("parsing expression");
+    tabs++;
+    #endif
+    while_stmt->condition = parseExpression(tokenList);
+    #ifdef DEBUG
+    tabs--;
+    #endif
+    expectToken(tokenList, R_PAREN);
+    
+    expectToken(tokenList, L_CURL_BRACKET);
+    while (showNextToken(tokenList).type != R_CURL_BRACKET)
     {
         #ifdef DEBUG
-        printDebug("parsing assignment");
+        printDebug("parsing statement");
         tabs++;
         #endif
-        stmt->type = ASSIGNMENT;
-        stmt->asmt = parseAssignment(tokenList);
+        while_stmt->body = parseStatement(tokenList);
         #ifdef DEBUG
         tabs--;
         #endif
     }
-    else if (nextToken.type == KW_WHILE)
-    {
-        #ifdef DEBUG
-        printDebug("parsing while statement");
-        tabs++;
-        #endif
-        stmt->type = WHILE_STATEMENT;
-        stmt->while_stmt = parseWhileStatement(tokenList);
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-    else if (nextToken.type == KW_IF)
-    {
-        #ifdef DEBUG
-        printDebug("parsing if statement");
-        tabs++;
-        #endif
-        stmt->type = IF_STATEMENT;
-        stmt->if_stmt = parseIfStatement(tokenList);
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-    else
-    {
-        printf("Expecting statement (identifier, if or while)\n");
-        exit(1);
-    }
+    expectToken(tokenList, R_CURL_BRACKET);
 
-    return stmt;
+    return while_stmt;
 }
 
 Asmt* parseAssignment(TOKEN_LIST* tokenList) {
@@ -208,18 +675,14 @@ Asmt* parseAssignment(TOKEN_LIST* tokenList) {
         exit(EXIT_FAILURE);
     }
 
+    asmt->contains_lexpr == false;
+
     asmt->id = expectToken(tokenList, IDENTIFIER).value.value_str;
-    if (showNextToken(tokenList).type == L_SQ_BRACKET) {
-        expectToken(tokenList, L_SQ_BRACKET);
-        #ifdef DEBUG
-        printDebug("parsing expression");
-        tabs++;
-        #endif
+    if (showNextToken(tokenList).type != ASSIGN)
+    {
         asmt->contains_lexpr = true;
+        expectToken(tokenList, L_SQ_BRACKET);
         asmt->lexpr = parseExpression(tokenList);
-        #ifdef DEBUG
-        tabs--;
-        #endif
         expectToken(tokenList, R_SQ_BRACKET);
     }
     expectToken(tokenList, ASSIGN);
@@ -236,478 +699,136 @@ Asmt* parseAssignment(TOKEN_LIST* tokenList) {
     return asmt;
 }
 
-IfStmt* parseIfStatement(TOKEN_LIST* tokenList) {
-    IfStmt *if_stmt = malloc(sizeof(IfStmt));
-    if (if_stmt == NULL)
-    {
-        perror("Error if statement malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    if_stmt->nb_stmt = 0;
+// ---- DEBUG ---------
 
-    ElseStmt *else_stmt = malloc(sizeof(ElseStmt));
-    if (else_stmt == NULL)
-    {
-        perror("Error else statement malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    else_stmt->nb_stmt = 0;
-    if_stmt->contains_elseStmt = false;
-
-    expectToken(tokenList, KW_IF);
-    expectToken(tokenList, L_PAREN);
-    #ifdef DEBUG
-    printDebug("parsing expression");
-    tabs++;
-    #endif
-    if_stmt->expr = parseExpression(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    expectToken(tokenList, R_PAREN);
-
-    expectToken(tokenList, L_CURL_BRACKET);
-    while (showNextToken(tokenList).type != R_CURL_BRACKET)
-    {
-        #ifdef DEBUG
-        printDebug("parsing statement");
-        tabs++;
-        #endif
-        if_stmt->stmt = realloc(if_stmt->stmt, sizeof(Stmt*) * (if_stmt->nb_stmt + 1));
-        if_stmt->stmt[if_stmt->nb_stmt] = parseStatement(tokenList);
-        if_stmt->nb_stmt++;
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-    expectToken(tokenList, R_CURL_BRACKET);
-    if (showNextToken(tokenList).type == KW_ELSE)
-    {
-        #ifdef DEBUG
-        printDebug("parsing else statement");
-        tabs++;
-        #endif
-        if_stmt->contains_elseStmt = true;
-        if_stmt->else_stmt = parseElseStatement(tokenList);
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-
-    return if_stmt;
+void printIndent(int indent)
+{
+    for (int i = 0; i < indent; i++)
+        printf("  ");
 }
 
-ElseStmt* parseElseStatement(TOKEN_LIST* tokenList) {
-    ElseStmt *else_stmt = malloc(sizeof(ElseStmt));
-    if (else_stmt == NULL)
+void printExpr(Expr* expr, int indent)
+{
+    if (!expr) return;
+
+    printIndent(indent);
+
+    switch (expr->type)
     {
-        perror("Error else statement malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    else_stmt->nb_stmt = 0;
+        case EXPR_BINARY:
+            printf("BINARY(%d)\n", expr->binary.op);
+            printExpr(expr->binary.left, indent + 1);
+            printExpr(expr->binary.right, indent + 1);
+            break;
 
-    expectToken(tokenList, KW_ELSE);
-    expectToken(tokenList, L_CURL_BRACKET);
-    while (showNextToken(tokenList).type != R_CURL_BRACKET)
-    {
-        #ifdef DEBUG
-        printDebug("parsing statement");
-        tabs++;
-        #endif
-        else_stmt->stmt = realloc(else_stmt->stmt, sizeof(Stmt*) * (else_stmt->nb_stmt + 1));
-        else_stmt->stmt[else_stmt->nb_stmt] = parseStatement(tokenList);
-        else_stmt->nb_stmt++;
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-    expectToken(tokenList, R_CURL_BRACKET);
+        case EXPR_UNARY:
+            printf("UNARY(%d)\n", expr->unary.op);
+            printExpr(expr->unary.operand, indent + 1);
+            break;
 
-    return else_stmt;
-}
+        case EXPR_IDENTIFIER:
+            printf("IDENTIFIER(%s)\n", expr->identifier.name);
+            break;
 
-WhileStmt* parseWhileStatement(TOKEN_LIST* tokenList) {
-    WhileStmt *while_stmt = malloc(sizeof(WhileStmt));
-    if (while_stmt == NULL)
-    {
-        perror("Error while statement malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    while_stmt->nb_stmt = 0;
+        case EXPR_ARRAY:
+            printf("ARRAY(%s)\n", expr->array.name);
+            printExpr(expr->array.index, indent + 1);
+            break;
 
-    expectToken(tokenList, KW_WHILE);
-    expectToken(tokenList, L_PAREN);
-    #ifdef DEBUG
-    printDebug("parsing expression");
-    tabs++;
-    #endif
-    while_stmt->expr = parseExpression(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    expectToken(tokenList, R_PAREN);
-    
-    expectToken(tokenList, L_CURL_BRACKET);
-    while (showNextToken(tokenList).type != R_CURL_BRACKET)
-    {
-        #ifdef DEBUG
-        printDebug("parsing statement");
-        tabs++;
-        #endif
-        while_stmt->stmt = realloc(while_stmt->stmt, sizeof(Stmt*) * (while_stmt->nb_stmt + 1));
-        while_stmt->stmt[while_stmt->nb_stmt] = parseStatement(tokenList);
-        while_stmt->nb_stmt++;
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-    expectToken(tokenList, R_CURL_BRACKET);
+        case EXPR_LITERAL:
+            printf("LITERAL ");
 
-    return while_stmt;
-}
-
-Expr* parseExpression(TOKEN_LIST* tokenList) {
-    Expr *expr = malloc(sizeof(Expr));
-    if (expr == NULL)
-    {
-        perror("Error expression malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    expr->nb_rconj = 0;
-
-    #ifdef DEBUG
-    printDebug("parsing conjunction");
-    tabs++;
-    #endif
-    expr->lconj = parseConjunction(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    while (showNextToken(tokenList).type == OR) {
-        acceptToken(tokenList);
-        #ifdef DEBUG
-        printDebug("parsing conjunction");
-        tabs++;
-        #endif
-        expr->rconj = realloc(expr->rconj, sizeof(Conj*) * (expr->nb_rconj + 1));
-        expr->rconj[expr->nb_rconj] = parseConjunction(tokenList);
-        expr->nb_rconj++;
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-
-    return expr;
-}
-
-Conj* parseConjunction(TOKEN_LIST* tokenList) {
-    Conj *conj = malloc(sizeof(Conj));
-    if (conj == NULL)
-    {
-        perror("Error conjonction malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    conj->nb_requal = 0;
-
-    #ifdef DEBUG
-    printDebug("parsing equality");
-    tabs++;
-    #endif
-    conj->lequal = parseEquality(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    while (showNextToken(tokenList).type == AND) {
-        acceptToken(tokenList);
-        #ifdef DEBUG
-        printDebug("parsing equality");
-        tabs++;
-        #endif
-        conj->requal = realloc(conj->requal, sizeof(Equal*) * (conj->nb_requal + 1));
-        conj->requal[conj->nb_requal] = parseEquality(tokenList);
-        conj->nb_requal++;
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-
-    return conj;
-}
-
-Equal* parseEquality(TOKEN_LIST* tokenList) {
-    Equal *equal = malloc(sizeof(Equal));
-    if (equal == NULL)
-    {
-        perror("Error expression malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    
-    #ifdef DEBUG
-    printDebug("parsing relation");
-    tabs++;
-    #endif
-    equal->lrelation = parseRelation(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    
-    TOKEN nextToken = showNextToken(tokenList);
-    if (nextToken.type == EQUALITY ||
-        nextToken.type == INEQUALITY)
-    {
-        acceptToken(tokenList);
-        #ifdef DEBUG
-        printDebug("parsing relation");
-        tabs++;
-        #endif
-        equal->rrelation = parseRelation(tokenList);
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-
-    return equal;
-}
-    
-Relation* parseRelation(TOKEN_LIST* tokenList) {
-    Relation *relation = malloc(sizeof(Relation));
-    if (relation == NULL)
-    {
-        perror("Error relation malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    #ifdef DEBUG
-    printDebug("parsing addition");
-    tabs++;
-    #endif
-    relation->laddition = parseAddition(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    
-    TOKEN nextToken = showNextToken(tokenList);
-    if (nextToken.type == LT ||
-        nextToken.type == LTE ||
-        nextToken.type == GT ||
-        nextToken.type == GTE)
-    {
-        acceptToken(tokenList);
-        #ifdef DEBUG
-        printDebug("parsing addition");
-        tabs++;
-        #endif
-        relation->raddition = parseAddition(tokenList);
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-
-    return relation;
-}
-
-Addition* parseAddition(TOKEN_LIST* tokenList) {
-    Addition *addition = malloc(sizeof(Addition));
-    if (addition == NULL)
-    {
-        perror("Error addition malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    addition->nb_term = 0;
-
-    #ifdef DEBUG
-    printDebug("parsing term");
-    tabs++;
-    #endif
-    addition->term = parseTerm(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-
-    TOKEN nextToken = showNextToken(tokenList);
-    while (nextToken.type == ADDITION ||
-        nextToken.type == SUBTRACTION)
-    {
-        acceptToken(tokenList);
-        #ifdef DEBUG
-        printDebug("parsing term");
-        tabs++;
-        #endif
-        addition->rterm = realloc(addition->rterm, sizeof(Term*) * (addition->nb_term + 1));
-        addition->rterm[addition->nb_term] = parseTerm(tokenList);
-        addition->nb_term++;
-        #ifdef DEBUG
-        tabs--;
-        #endif
-        nextToken = showNextToken(tokenList);
+            switch (expr->literal.value_type)
+            {
+                case TK_INT:
+                    printf("%d\n", expr->literal.value.value_int);
+                    break;
+                case TK_FLOAT:
+                    printf("%f\n", expr->literal.value.value_float);
+                    break;
+                case TK_BOOL:
+                    printf("%s\n", expr->literal.value.value_bool ? "true" : "false");
+                    break;
+                case TK_CHAR:
+                    printf("%s\n", expr->literal.value.value_str);
+                    break;
+                default:
+                    printf("unknown\n");
+            }
+            break;
     }
 }
 
-Term* parseTerm(TOKEN_LIST* tokenList) {
-    Term *term = malloc(sizeof(Term));
-    if (term == NULL)
+void printStmt(Stmt* stmt, int indent)
+{
+    while (stmt)
     {
-        perror("Error term malloc.\n");
-        exit(EXIT_FAILURE);
-    }
-    term->nb_factor = 0;
+        printIndent(indent);
 
-    #ifdef DEBUG
-    printDebug("parsing factor");
-    tabs++;
-    #endif
-    term->factor = parseFactor(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    TOKEN nextToken = showNextToken(tokenList);
-    while (nextToken.type == MULTIPLICATION ||
-        nextToken.type == MODULO ||
-        nextToken.type == DIVISION)
-    {
-        acceptToken(tokenList);
-        #ifdef DEBUG
-        printDebug("parsing factor");
-        tabs++;
-        #endif
-        term->rfactor = realloc(term->rfactor, sizeof(Factor*) * (term->nb_factor + 1));
-        term->rfactor[term->nb_factor] = parseFactor(tokenList);
-        term->nb_factor++;
-        #ifdef DEBUG
-        tabs--;
-        #endif
-        nextToken = showNextToken(tokenList);
-    }
+        switch (stmt->type)
+        {
+            case STMT_DECL:
+                printf("DECL %s\n", stmt->decl->id);
+                break;
 
-    return term;
-}
+            case STMT_ASSIGN:
+                printf("ASSIGN %s\n", stmt->asmt->id);
+                printExpr(stmt->asmt->rexpr, indent + 1);
+                break;
 
-Factor* parseFactor(TOKEN_LIST* tokenList) {
-    Factor *factor = malloc(sizeof(Factor));
-    if (factor == NULL)
-    {
-        perror("Error factor malloc.\n");
-        exit(EXIT_FAILURE);
-    }
+            case STMT_IF_ELSE:
+                printf("IF\n");
+                printExpr(stmt->expr, indent + 1);
 
-    TOKEN nextToken = showNextToken(tokenList);
-    if (nextToken.type == SUBTRACTION ||
-        nextToken.type == NOT)
-    {
-        acceptToken(tokenList);
-        factor->unaryop = nextToken.type;
-    }
-    #ifdef DEBUG
-    printDebug("parsing primary");
-    tabs++;
-    #endif
-    factor->primary = parsePrimary(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
+                printIndent(indent);
+                printf("THEN:\n");
+                printStmt(stmt->body, indent + 1);
 
-    return factor;
-}
+                if (stmt->else_body)
+                {
+                    printIndent(indent);
+                    printf("ELSE:\n");
+                    printStmt(stmt->else_body, indent + 1);
+                }
+                break;
 
-Primary* parsePrimary(TOKEN_LIST* tokenList) {
-    Primary *primary = malloc(sizeof(Primary));
-    if (primary == NULL)
-    {
-        perror("Error primary malloc.\n");
-        exit(EXIT_FAILURE);
-    }
+            case STMT_WHILE:
+                printf("WHILE\n");
+                printExpr(stmt->expr, indent + 1);
+                printStmt(stmt->body, indent + 1);
+                break;
 
-    TOKEN nextToken = showNextToken(tokenList);
-    if (nextToken.type == IDENTIFIER) {
-        primary->type = PRIMARY_IDENTIFIER;
-        primary->identifier.id = expectToken(tokenList, IDENTIFIER).value.value_str;
-        if (nextToken.type == L_SQ_BRACKET) {
-            expectToken(tokenList, L_SQ_BRACKET);
-            #ifdef DEBUG
-            printDebug("parsing expression");
-            tabs++;
-            #endif
-            primary->type = PRIMARY_ARRAY_ACCESS;
-            primary->identifier.expr = parseExpression(tokenList);
-            #ifdef DEBUG
-            tabs--;
-            #endif
-            expectToken(tokenList, R_SQ_BRACKET);
+            case STMT_RETURN:
+                printf("RETURN\n");
+                printExpr(stmt->expr, indent + 1);
+                break;
+
+            case STMT_BLOCK:
+                printf("BLOCK\n");
+                printStmt(stmt->body, indent + 1);
+                break;
         }
+
+        stmt = stmt->next;
     }
-    /* Si le token est un literal */
-    else if (nextToken.type == INT_NUMBER ||
-        nextToken.type == FLOAT_NUMBER ||
-        nextToken.type == STRING ||
-        nextToken.type == KW_FALSE ||
-        nextToken.type == KW_TRUE)
-    {
-        acceptToken(tokenList);
-        primary->type = PRIMARY_LITERAL;
-        if (nextToken.type == INT_NUMBER) {
-            primary->value_type = TYPE_INT;
-            primary->value.value_int = nextToken.value.value_int;
-        }
-        else if (nextToken.type == FLOAT_NUMBER) {
-            primary->value_type = TYPE_FLOAT;
-            primary->value.value_float = nextToken.value.value_float;
-        }
-        else if (nextToken.type == KW_FALSE) {
-            primary->value_type = TYPE_BOOL;
-            primary->value.value_bool = false;
-        }
-        else if (nextToken.type == KW_TRUE) {
-            primary->value_type = TYPE_BOOL;
-            primary->value.value_bool = true;
-        }
-        else if (nextToken.type == STRING) {
-            primary->value_type = TYPE_CHAR;
-            primary->value.value_str = nextToken.value.value_str;
-        }
-    }
-    else if (nextToken.type == L_PAREN) {
-        #ifdef DEBUG
-        printDebug("parsing parenthesis");
-        tabs++;
-        #endif
-        primary->type = PRIMARY_PARENTHESIZED_EXPRESSION;
-        primary->parent = parseParenth(tokenList);
-        #ifdef DEBUG
-        tabs--;
-        #endif
-    }
-    else
-    {
-        if (nextToken.ownstr) {
-            printf("Expecting identifier, literal or parenthesis at line : %d, column : %d, value : %s.\n", nextToken.line, nextToken.column, nextToken.value.value_str);
-        }
-        else {
-            printf("Expecting identifier, literal or parenthesis at line : %d, column : %d, value : %s.\n", nextToken.line, nextToken.column, (char[]){nextToken.value.value_chr, '\0'});
-        }
-        exit(1);
-    }
-    
-    return primary;
 }
 
-Parenth* parseParenth(TOKEN_LIST* tokenList) {
-    Parenth *parenth = malloc(sizeof(Parenth));
-    if (parenth == NULL)
+void printProgram(Program* program)
+{
+    printf("PROGRAM\n");
+
+    Decl* decl = program->decl;
+
+    while (decl)
     {
-        perror("Error parenthesis malloc.\n");
-        exit(EXIT_FAILURE);
+        printf("DECL %s\n", decl->id);
+
+        if (decl->code)
+        {
+            printStmt(decl->code, 1);
+        }
+
+        decl = (Decl*)decl->code; // selon ton design
     }
-
-    expectToken(tokenList, L_PAREN);
-    #ifdef DEBUG
-    printDebug("parsing expression");
-    tabs++;
-    #endif
-    parenth->expr = parseExpression(tokenList);
-    #ifdef DEBUG
-    tabs--;
-    #endif
-    expectToken(tokenList, R_PAREN);
-
-    return parenth;
 }
+

@@ -4,6 +4,7 @@
 #include "parser.h"
 #include "lexer.h"
 #include "utils.h"
+#include "visitor.h"
 
 int main(int argc, char* argv[]) {
 	if (argc != 2) {
@@ -27,11 +28,17 @@ int main(int argc, char* argv[]) {
 	#ifdef DEBUG
     printf("Analyse lexicale :\n-------------------------------------------------------------------------------\n");
 	#endif
+
 	lexer(&text, &tokenList);
+	
 	#ifdef DEBUG
     printf("Analyse syntaxique :\n-----------------------------------------------------------------------------\n");
 	#endif
-	parser(&tokenList);
+	
+	Program* program = parser(&tokenList);
+
+	Visitor printer = createPrettyPrinter();
+    printer.visitProgram(&printer, program);
 
 	freeTokens(&tokenList);
 	free(backup_text);

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "utils.h"
+#include "visitor.h"
 
 #ifdef DEBUG
 int tabs = 0;
@@ -41,14 +42,14 @@ TOKEN expectToken(TOKEN_LIST* tokenList, enum type_t tokenType) {
 /**
 * @brief Analyse récursive descendante LL(1).
 */
-void parser(TOKEN_LIST* tokenList) {
+Program* parser(TOKEN_LIST* tokenList) {
     /* Initialise à 0 l'indice du token courant */
     tokenList->indexToken = 0;
 
     /* TODO : remove comments */
     Program *program = parseProgram(tokenList);
 
-    printProgram(program);
+    return program;
 }
 
 // ------------------------------------ Méthodes de parsing ----------------------------------------
@@ -709,173 +710,3 @@ Asmt* parseAssignment(TOKEN_LIST* tokenList) {
 
     return asmt;
 }
-
-// ---- DEBUG ---------
-
-const char* tokenToString(enum type_t type) {
-    switch (type) {
-        case ADDITION: return "+";
-        case SUBTRACTION: return "-";
-        case MULTIPLICATION: return "*";
-        case DIVISION: return "/";
-        case MODULO: return "%";
-
-        case EQUALITY: return "==";
-        case INEQUALITY: return "!=";
-
-        case LT: return "<";
-        case LTE: return "<=";
-        case GT: return ">";
-        case GTE: return ">=";
-
-        case AND: return "&&";
-        case OR: return "||";
-        case NOT: return "!";
-
-        default: return "?";
-    }
-}
-
-void printIndent(int indent)
-{
-    for (int i = 0; i < indent; i++)
-        printf("  ");
-}
-
-void printExpr(Expr* expr, int indent)
-{
-    if (!expr) return;
-
-    printIndent(indent);
-
-    switch (expr->type)
-    {
-        case EXPR_BINARY:
-            printf("BINARY(%s)\n", tokenToString(expr->binary.op));
-            printExpr(expr->binary.left, indent + 1);
-            printExpr(expr->binary.right, indent + 1);
-            break;
-
-        case EXPR_UNARY:
-            printf("UNARY");
-            if (expr->unary.got_op)
-            {
-                printf("(%s)", tokenToString(expr->unary.op));
-            }
-            printf("\n");
-
-            printExpr(expr->unary.operand, indent + 1);
-            break;
-
-        case EXPR_IDENTIFIER:
-            printf("IDENTIFIER(%s)\n", expr->identifier.name);
-            break;
-
-        case EXPR_ARRAY:
-            printf("ARRAY(%s)\n", expr->array.name);
-            printExpr(expr->array.index, indent + 1);
-            break;
-
-        case EXPR_LITERAL:
-            printf("LITERAL ");
-
-            switch (expr->literal.value_type)
-            {
-                case TK_INT:
-                    printf("%d\n", expr->literal.value.value_int);
-                    break;
-                case TK_FLOAT:
-                    printf("%f\n", expr->literal.value.value_float);
-                    break;
-                case TK_BOOL:
-                    printf("%s\n", expr->literal.value.value_bool ? "true" : "false");
-                    break;
-                case TK_CHAR:
-                    printf("%s\n", expr->literal.value.value_str);
-                    break;
-                default:
-                    printf("unknown\n");
-            }
-            break;
-    }
-}
-
-void printStmt(Stmt* stmt, int indent)
-{
-    while (stmt)
-    {
-        printIndent(indent);
-
-        switch (stmt->type)
-        {
-            case STMT_DECL:
-                printf("DECL %s\n", stmt->decl->id);
-                break;
-
-            case STMT_ASSIGN:
-                printf("ASSIGN %s\n", stmt->asmt->id);
-                if (stmt->asmt->contains_lexpr)
-                {
-                    printf("[");
-                    printExpr(stmt->asmt->lexpr, indent + 1);
-                    printf("]");
-                }
-                printExpr(stmt->asmt->rexpr, indent + 1);
-                break;
-
-            case STMT_IF_ELSE:
-                printf("IF\n");
-                printExpr(stmt->expr, indent + 1);
-
-                printIndent(indent);
-                printf("THEN:\n");
-                printStmt(stmt->body, indent + 1);
-
-                if (stmt->else_body)
-                {
-                    printIndent(indent);
-                    printf("ELSE:\n");
-                    printStmt(stmt->else_body, indent + 1);
-                }
-                break;
-
-            case STMT_WHILE:
-                printf("WHILE\n");
-                printExpr(stmt->expr, indent + 1);
-                printStmt(stmt->body, indent + 1);
-                break;
-
-            case STMT_RETURN:
-                printf("RETURN\n");
-                printExpr(stmt->expr, indent + 1);
-                break;
-
-            case STMT_BLOCK:
-                printf("BLOCK\n");
-                printStmt(stmt->body, indent + 1);
-                break;
-        }
-
-        stmt = stmt->next;
-    }
-}
-
-void printProgram(Program* program)
-{
-    printf("PROGRAM\n");
-
-    Decl* decl = program->decl;
-
-    while (decl)
-    {
-        printf("DECL %s\n", decl->id);
-
-        if (decl->code)
-        {
-            printStmt(decl->code, 1);
-        }
-
-        decl = (Decl*)decl->code; // selon ton design
-    }
-}
-

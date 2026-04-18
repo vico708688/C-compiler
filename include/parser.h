@@ -5,7 +5,7 @@
 #include "stdbool.h"
 #include "AST.h"
 
-void parser(TOKEN_LIST* tokenList);
+Program* parser(TOKEN_LIST* tokenList);
 
 TOKEN showNextToken(TOKEN_LIST* tokenList);
 TOKEN acceptToken(TOKEN_LIST* tokenList);

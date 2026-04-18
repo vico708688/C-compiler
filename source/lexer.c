@@ -6,8 +6,8 @@
 
 #include "utils.h"
 
-static int column = 0;
-static int line = 0;
+static int column = 1;
+static int line = 1;
 
 void addToken(TOKEN_LIST *tokenList, enum type_t type, union TOKEN_VALUE value, bool ownstr) {
 	TOKEN token = { .type = type, .value = value, .line = line, .column = column, .ownstr = ownstr };

@@ -39,6 +39,7 @@ struct Expr {
         } binary;
 
         struct {
+            bool got_op;
             enum type_t op;
             Expr* operand;
         } unary;

@@ -147,7 +147,7 @@ Expr* newUnaryExpr(Expr* expression, enum type_t op) {
         perror("Error binary expression malloc.\n");
         exit(EXIT_FAILURE);
     }
-    expr->type = EXPR_BINARY;
+    expr->type = EXPR_UNARY;
     expr->unary.op = op;
     expr->unary.operand = expression;
     return expr;
@@ -328,26 +328,31 @@ Expr* parseTerm(TOKEN_LIST* tokenList) {
 }
 
 Expr* parseFactor(TOKEN_LIST* tokenList) {
-    Expr *e1 = malloc(sizeof(Expr));
-    if (e1 == NULL)
-    {
-        perror("Error factor malloc.\n");
-        exit(EXIT_FAILURE);
-    }
+    enum type_t op;
+    bool has_op = false;
 
     TOKEN nextToken = showNextToken(tokenList);
     if (nextToken.type == SUBTRACTION ||
         nextToken.type == NOT)
     {
+        has_op = true;
+        op = nextToken.type;
         acceptToken(tokenList);
-        e1->unary.op = nextToken.type;
     }
+
     #ifdef DEBUG
-    printDebug("parsing primary");
+    printDebug("parsing primary unary");
     tabs++;
     #endif
-    e1->unary.operand = parsePrimary(tokenList);
-    e1->type = EXPR_UNARY;
+
+    Expr* e1 = parsePrimary(tokenList);
+
+    if (has_op) {
+        Expr* unary = newUnaryExpr(e1, op);
+        unary->unary.got_op = true;
+        e1 = unary;
+    }
+    
     #ifdef DEBUG
     tabs--;
     #endif
@@ -371,22 +376,28 @@ Expr* parsePrimary(TOKEN_LIST* tokenList) {
         }
         printf("got identifier\n");
         #endif
-        if (nextToken.type == L_SQ_BRACKET) {
+
+        char* name = expectToken(tokenList, IDENTIFIER).value.value_str;
+        if (showNextToken(tokenList).type == L_SQ_BRACKET) {
             expectToken(tokenList, L_SQ_BRACKET);
+
             #ifdef DEBUG
             printDebug("parsing expression for array access");
             tabs++;
             #endif
-            e1->array.name = expectToken(tokenList, IDENTIFIER).value.value_str;
-            e1->array.index = parseExpression(tokenList);
+
+            e1->array.name = name;
             e1->type = EXPR_ARRAY;
+            e1->array.index = parseExpression(tokenList);
+
             #ifdef DEBUG
             tabs--;
             #endif
+
             expectToken(tokenList, R_SQ_BRACKET);
         }
         else {
-            e1->identifier.name = expectToken(tokenList, IDENTIFIER).value.value_str;
+            e1->identifier.name = name;
             e1->type = EXPR_IDENTIFIER;
         }
     }
@@ -398,7 +409,7 @@ Expr* parsePrimary(TOKEN_LIST* tokenList) {
         nextToken.type == KW_TRUE)
     {
         acceptToken(tokenList);
-        e1->type = EXPR_UNARY;
+        e1->type = EXPR_LITERAL;
         if (nextToken.type == INT_NUMBER) {
             #ifdef DEBUG
             printDebug("got integer literal");
@@ -675,7 +686,7 @@ Asmt* parseAssignment(TOKEN_LIST* tokenList) {
         exit(EXIT_FAILURE);
     }
 
-    asmt->contains_lexpr == false;
+    asmt->contains_lexpr = false;
 
     asmt->id = expectToken(tokenList, IDENTIFIER).value.value_str;
     if (showNextToken(tokenList).type != ASSIGN)
@@ -701,6 +712,30 @@ Asmt* parseAssignment(TOKEN_LIST* tokenList) {
 
 // ---- DEBUG ---------
 
+const char* tokenToString(enum type_t type) {
+    switch (type) {
+        case ADDITION: return "+";
+        case SUBTRACTION: return "-";
+        case MULTIPLICATION: return "*";
+        case DIVISION: return "/";
+        case MODULO: return "%";
+
+        case EQUALITY: return "==";
+        case INEQUALITY: return "!=";
+
+        case LT: return "<";
+        case LTE: return "<=";
+        case GT: return ">";
+        case GTE: return ">=";
+
+        case AND: return "&&";
+        case OR: return "||";
+        case NOT: return "!";
+
+        default: return "?";
+    }
+}
+
 void printIndent(int indent)
 {
     for (int i = 0; i < indent; i++)
@@ -716,13 +751,19 @@ void printExpr(Expr* expr, int indent)
     switch (expr->type)
     {
         case EXPR_BINARY:
-            printf("BINARY(%d)\n", expr->binary.op);
+            printf("BINARY(%s)\n", tokenToString(expr->binary.op));
             printExpr(expr->binary.left, indent + 1);
             printExpr(expr->binary.right, indent + 1);
             break;
 
         case EXPR_UNARY:
-            printf("UNARY(%d)\n", expr->unary.op);
+            printf("UNARY");
+            if (expr->unary.got_op)
+            {
+                printf("(%s)", tokenToString(expr->unary.op));
+            }
+            printf("\n");
+
             printExpr(expr->unary.operand, indent + 1);
             break;
 
@@ -773,6 +814,12 @@ void printStmt(Stmt* stmt, int indent)
 
             case STMT_ASSIGN:
                 printf("ASSIGN %s\n", stmt->asmt->id);
+                if (stmt->asmt->contains_lexpr)
+                {
+                    printf("[");
+                    printExpr(stmt->asmt->lexpr, indent + 1);
+                    printf("]");
+                }
                 printExpr(stmt->asmt->rexpr, indent + 1);
                 break;
 

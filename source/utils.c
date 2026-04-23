@@ -83,14 +83,24 @@ void initRegexes(regexList* regexes) {
 	}
 }
 
-TOKEN_LIST initTokenList(char** text) {
+TOKEN_LIST *initTokenList(char** text) {
 	/* Allocation de 256 tokens puis realloc */
-	TOKEN_LIST list = { .size = 256 };
+	TOKEN_LIST *tokenList = malloc(sizeof(TOKEN_LIST));
+
+	if (tokenList == NULL)
+	{
+		printf("Error tokenList malloc.\n");
+		exit(1);
+	}
 	
-	if ((list.tokens = calloc(list.size, sizeof(TOKEN))) == NULL) {
+	
+	tokenList->size = 256;
+	tokenList->indexToken = 0;
+
+	if ((tokenList->tokens = calloc(tokenList->size, sizeof(TOKEN))) == NULL) {
 		perror("Error calloc\n");
 		exit(1);
 	}
 
-	return list;
+	return tokenList;
 }

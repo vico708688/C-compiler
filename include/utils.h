@@ -19,7 +19,7 @@ void freeTokens(TOKEN_LIST* tokenList);
 void freeRegexes(regexList* regexes);
 
 void initRegexes(regexList* regexes);
-TOKEN_LIST initTokenList(char** text);
+TOKEN_LIST *initTokenList(char** text);
 
 char* extractSubString(char** string, int len);
 

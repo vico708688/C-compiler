@@ -18,7 +18,7 @@ int getInteger(char** text, int lenToken);
 float getFloat(char** text, int lenToken);
 char* getChar(char** text, int lenToken);
 
-void lexer(char** text, TOKEN_LIST *tokenList);
+TOKEN_LIST lexer(char** text);
 
 void advance(char** text, int nb);
 

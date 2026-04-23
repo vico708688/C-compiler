@@ -193,6 +193,7 @@ static void visitProgram(Visitor* v, Program* program) {
 
 /* ------------------- FACTORY ------------------- */
 
+// Mettre dans un fichier pretty_printer, c'est un type de visiteur
 Visitor createPrettyPrinter() {
     Visitor v;
 

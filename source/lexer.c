@@ -131,10 +131,12 @@ void advance(char** text, int nb) {
 /**
 * @brief Créer une liste de tokens à partir d'une chaine text et la stock dans tokenList
 */
-void lexer(char** text, TOKEN_LIST *tokenList) {
+TOKEN_LIST lexer(char** text) {
 	int lenToken = 0;
 	regexList regexes;
 	initRegexes(&regexes);
+
+	TOKEN_LIST *tokenList = initTokenList(text);
 
 	/* Analyse lexicale */
 	while (!isAtEnd(text)) {
@@ -376,4 +378,6 @@ void lexer(char** text, TOKEN_LIST *tokenList) {
 	#endif
 
 	freeRegexes(&regexes);
+
+	return *tokenList;
 }

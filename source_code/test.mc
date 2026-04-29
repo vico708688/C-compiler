@@ -1,3 +1,9 @@
 int main() {
-    int i;
+    if (test1) {
+        i = 0;
+    } else {
+        while(i != 10) {
+            i = i + 1;
+        }
+    }
 }

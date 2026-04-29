@@ -1,5 +1,5 @@
-#ifndef H_VISITOR
-#define H_VISITOR
+#ifndef H_PRETTY_PRINTER
+#define H_PRETTY_PRINTER
 
 #include "AST.h"
 
@@ -13,6 +13,11 @@ struct Visitor {
 
     int indent;
 };
+
+static void visitExpr(Visitor* v, Expr* expr);
+static void visitStmt(Visitor* v, Stmt* stmt);
+static void visitDecl(Visitor* v, Decl* decl);
+static void visitProgram(Visitor* v, Program* program);
 
 Visitor createPrettyPrinter();
 

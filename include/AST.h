@@ -6,10 +6,9 @@
 
 // Statement :
 //      Body of a function.
-//      Indicates that the program is to take a particular action in the order speci-
-//      fied, such as computing a value, performing a loop, or choosing between
-//      branches of an alternative. A statement can also be a declaration of a local
-//      variable.
+//      Indicates that the program is to take a particular action in the order specified,
+//      such as computing a value, performing a loop, or choosing between branches
+//      of an alternative. A statement can also be a declaration of a local variable.
 // Declaration :
 //      States the existence of a variable or a function
 // Expression :

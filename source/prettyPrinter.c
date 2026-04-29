@@ -1,11 +1,8 @@
-#include "visitor.h"
+#include "prettyPrinter.h"
 
 #include <stdio.h>
 
-static void visitExpr(Visitor* v, Expr* expr);
-static void visitStmt(Visitor* v, Stmt* stmt);
-static void visitDecl(Visitor* v, Decl* decl);
-static void visitProgram(Visitor* v, Program* program);
+/* ------------------- UTILS ------------------- */
 
 void printIndent(int indent) {
     for (int i = 0; i < indent; i++)
@@ -159,7 +156,7 @@ static void visitStmt(Visitor* v, Stmt* stmt) {
     }
 }
 
-/* ------------------- DECL ------------------- */
+/* ------------------- DECLARATIONS ------------------- */
 
 static void visitDecl(Visitor* v, Decl* decl) {
     if (!decl) return;
@@ -185,15 +182,8 @@ static void visitDecl(Visitor* v, Decl* decl) {
     }
 }
 
-/* ------------------- PROGRAM ------------------- */
+/* --------------------- VISITOR ----------------------- */
 
-static void visitProgram(Visitor* v, Program* program) {
-    visitDecl(v, program->decl);
-}
-
-/* ------------------- FACTORY ------------------- */
-
-// Mettre dans un fichier pretty_printer, c'est un type de visiteur
 Visitor createPrettyPrinter() {
     Visitor v;
 
@@ -205,4 +195,8 @@ Visitor createPrettyPrinter() {
     v.indent = 0;
 
     return v;
+}
+
+static void visitProgram(Visitor* v, Program* program) {
+    visitDecl(v, program->decl);
 }

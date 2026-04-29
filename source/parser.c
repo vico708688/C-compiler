@@ -5,7 +5,8 @@
 #include <string.h>
 
 #include "utils.h"
-#include "visitor.h"
+// #include "prettyPrinter.h"
+#include "checker.h"
 
 #ifdef DEBUG
 int tabs = 0;
